@@ -1,2 +1,22 @@
 # ChromMovie-flow
-Flow Matching chromatin structure generation based on ChromMovie simulations
+
+[![License](https://img.shields.io/github/license/SFGLab/ChromMovie-flow)](LICENSE)
+
+## Flow Matching chromatin structure generation based on ChromMovie simulations
+
+Pipeline stages:
+
+Preprocessing:
+* Embed RNA-seq and ATAC-seq
+* Prepare data for ChromMovie
+* Run ChromMovie simulations
+ 
+Flow Matching:
+* Learn interpoland phi
+* Compare the impact of phi on trajectories
+* Train OT and final velocity field
+* Compare and visualize resulting trajectories
+ 
+Finally:
+* Analyze
+
