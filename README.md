@@ -12,7 +12,7 @@ Preprocessing:
 * Run ChromMovie simulations
  
 Flow Matching:
-* Learn interpoland phi
+* Learn interpolant $\varphi$
 * Compare the impact of phi on trajectories
 * Train OT and final velocity field
 * Compare and visualize resulting trajectories
