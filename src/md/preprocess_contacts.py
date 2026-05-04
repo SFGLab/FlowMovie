@@ -1,5 +1,7 @@
+import os
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from scipy.spatial import ConvexHull, distance_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -30,6 +32,16 @@ def load_stat_file(stat_file_path):
     return df
 
 
+def load_contact_data(contact_data_path):
+    """
+    Loads the file with the contact data.
+    The input data is expected to be in bedpe format with an additional column specifying the cellid.
+    """
+    df = pd.read_csv(contact_data_path, header=None)
+    df.columns = ["chrom1", "start1", "end1", "chrom2", "start2", "end2", "cellid"]
+    return df
+
+
 def get_traj_metacell_ids(stat_file_path, cellid_1, cellid_2, n=2, m=10):
     df = load_stat_file(stat_file_path)
 
@@ -54,6 +66,9 @@ def get_traj_metacell_ids(stat_file_path, cellid_1, cellid_2, n=2, m=10):
 
 
 def plot_metacells(stat_file_path, metacell_ids):
+    """
+    Visualisation function for ready metacell_ids form get_traj_metacell_ids() function.
+    """
     df = load_stat_file(stat_file_path)
     df['traj_metacell'] = 'Rest'
 
@@ -82,11 +97,36 @@ def plot_metacells(stat_file_path, metacell_ids):
     plt.tight_layout()
     plt.show()
 
+
+def prepare_CM_input(output_path, contact_file_path, stat_file_path, cellid_1, cellid_2, n=2, m=10):
+    """
+    Prepares the input in a proper csv format suitable for ChromMovie simulations.
+    It takes parameters of particular trajectory as input (in particular start and end cell - cellid_1 and cellid_2).
+    Contact data is specified through 'contact_file_path' parameter. 
+    The input data is expected to be in bedpe format with an additional column specifying the cellid.
+    The output csv files are saved into the 'output_path'.
+    """
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    metacells_ids = get_traj_metacell_ids(stat_file_path, cellid_1, cellid_2, n, m)
+    df_contact = load_contact_data(contact_file_path)
+    
+    print("Preparing csv contact files for the metacells...")
+    for i in tqdm(range(n)):
+        df_metacell = df_contact[df_contact['cellid'].isin(metacells_ids[i])]
+        df_metacell = df_metacell.drop('cellid', axis=1)
+        df_metacell.to_csv(os.path.join(output_path, f'metacell_{str(i).zfill(3)}.csv'), index=False)
+
+
 if __name__ == "__main__":
-    stat_file_path = "data/unique_cells_PATSKI_100.txt"
+    out_file = "./ChromMovie-flow/outputs/md/test00"
+    stat_file_path = "./data/unique_cells_PATSKI_100.txt"
+    contact_file = "data/final_dataset_downsampled_100/filtered_ChIA-PET.bedpe"
+    cellid1, cellid2 = 'SCG0088_CTGTTAAAGTCACTAA-1', 'SCG0090_CATCATAAGTAAGTGG-1'
+    # cellids = get_traj_metacell_ids(stat_file_path, \
+    #                 'SCG0088_CTGTTAAAGTCACTAA-1', 'SCG0090_CATCATAAGTAAGTGG-1', n=3, m=10)
 
-    cellids = get_traj_metacell_ids(stat_file_path, \
-                    'SCG0088_CTGTTAAAGTCACTAA-1', 'SCG0090_CATCATAAGTAAGTGG-1', n=3, m=10)
+    # plot_metacells(stat_file_path, cellids)
 
-    plot_metacells(stat_file_path, cellids)
-
+    prepare_CM_input(out_file, contact_file, stat_file_path, cellid1, cellid2, n=3, m=10)
