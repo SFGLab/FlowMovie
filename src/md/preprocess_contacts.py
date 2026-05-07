@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from scipy.spatial import ConvexHull, distance_matrix
+from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -42,7 +43,11 @@ def load_contact_data(contact_data_path):
     return df
 
 
-def get_traj_metacell_ids(stat_file_path, cellid_1, cellid_2, n=2, m=10):
+def get_traj_metacell_ids_linear(stat_file_path, cellid_1, cellid_2, n=2, m=10):
+    """
+    Prepares a list of lists of cellids for a given trajectory between cellid_1 and cellid_2.
+    The resulting list will be of length n, and each set of cells will be of size m.
+    """
     df = load_stat_file(stat_file_path)
 
     cellid_list = list(df['cellid'])
@@ -63,6 +68,49 @@ def get_traj_metacell_ids(stat_file_path, cellid_1, cellid_2, n=2, m=10):
         metacell_ids.append(cellids)
     
     return metacell_ids
+
+
+def get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n=2, m=10):
+    """
+    Prepares a 3 lists of lists of cellids for a trajectories between cellid_1, cellid_2 and cellid_3.
+    The resulting lists will be of length n, and each set of cells will be of size m.
+    """
+    df = load_stat_file(stat_file_path)
+
+    cellid_list = list(df['cellid'])
+    for cellid in [cellid_1, cellid_2, cellid_3]:
+        if cellid not in cellid_list:
+            raise(Exception(f"Given cellid ({cellid}) cannot be found in the statistics file!"))
+
+    anchor_cellids = [cellid_list.index(cellid) for cellid in [cellid_1, cellid_2, cellid_3]]
+    anchor_positions = [np.array([df.loc[id1, 'PC_1'], df.loc[id1, 'PC_2']]) for id1 in anchor_cellids]
+
+    t = np.array([0, 1, 2, 3])
+    csX = CubicSpline(t, [pos[0] for pos in anchor_positions] + [anchor_positions[0][0]], bc_type='periodic')
+    csY = CubicSpline(t, [pos[1] for pos in anchor_positions] + [anchor_positions[0][1]], bc_type='periodic')
+
+    centers12 = [ [csX(t), csY(t)] for t in np.linspace(0, 1, n)]
+    centers23 = [ [csX(t), csY(t)] for t in np.linspace(1, 2, n)]
+    centers31 = [ [csX(t), csY(t)] for t in np.linspace(2, 3, n)]
+    
+    metacell_ids12 = []
+    metacell_ids23 = []
+    metacell_ids31 = []
+    
+    for i in range(n):
+        distances = [np.linalg.norm(centers12[i] - np.array(df.loc[j, ['PC_1', 'PC_2']])) for j in range(df.shape[0])]
+        cellids = [x for _, x in sorted(zip(distances, cellid_list))][:m]
+        metacell_ids12.append(cellids)
+
+        distances = [np.linalg.norm(centers23[i] - np.array(df.loc[j, ['PC_1', 'PC_2']])) for j in range(df.shape[0])]
+        cellids = [x for _, x in sorted(zip(distances, cellid_list))][:m]
+        metacell_ids23.append(cellids)
+        
+        distances = [np.linalg.norm(centers31[i] - np.array(df.loc[j, ['PC_1', 'PC_2']])) for j in range(df.shape[0])]
+        cellids = [x for _, x in sorted(zip(distances, cellid_list))][:m]
+        metacell_ids31.append(cellids)
+        
+    return metacell_ids12, metacell_ids23, metacell_ids31
 
 
 def plot_metacells(stat_file_path, metacell_ids, save_path=None):
@@ -101,7 +149,7 @@ def plot_metacells(stat_file_path, metacell_ids, save_path=None):
         plt.show()
 
 
-def prepare_CM_input_trajectory(output_path, contact_file_path, stat_file_path, cellid_1, cellid_2, n=2, m=10):
+def prepare_CM_input_trajectory(metacells_ids, output_path, contact_file_path, stat_file_path, cellid_1, cellid_2, n=2, m=10):
     """
     Prepares the input for a single trajectory in a proper csv format suitable for ChromMovie simulations.
     It takes parameters of particular trajectory as input (in particular start and end cell - cellid_1 and cellid_2).
@@ -112,7 +160,6 @@ def prepare_CM_input_trajectory(output_path, contact_file_path, stat_file_path, 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    metacells_ids = get_traj_metacell_ids(stat_file_path, cellid_1, cellid_2, n, m)
     df_contact = load_contact_data(contact_file_path)
     
     # print("Preparing csv contact files for the metacells...")
@@ -137,34 +184,58 @@ def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2
 
     print("Preparing trajectory input for ChromMovie simulations...")
     for i in tqdm(range(n_traj)):
-        # G1 -> S
         cellid_1 = np.random.choice(ids_G1)
         cellid_2 = np.random.choice(ids_S)
-        prepare_CM_input_trajectory(os.path.join(output_path, 'G1>S', f'trajectory_{str(i).zfill(3)}'), \
+        cellid_3 = np.random.choice(ids_G2)
+
+        metacells_ids12, metacells_ids23, metacells_ids31 = \
+            get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n, m)
+        # G1 -> S
+        prepare_CM_input_trajectory(metacells_ids12, \
+                                    os.path.join(output_path, 'G1>S', f'trajectory_{str(i).zfill(3)}'), \
                                     contact_file_path, stat_file_path,\
                                     cellid_1, cellid_2, n=n, m=m)
         # S -> G2M
-        cellid_1 = np.random.choice(ids_S)
-        cellid_2 = np.random.choice(ids_G2)
-        prepare_CM_input_trajectory(os.path.join(output_path, 'S>G2M', f'trajectory_{str(i).zfill(3)}'), \
+        prepare_CM_input_trajectory(metacells_ids23, \
+                                    os.path.join(output_path, 'S>G2M', f'trajectory_{str(i).zfill(3)}'), \
                                     contact_file_path, stat_file_path,\
                                     cellid_1, cellid_2, n=n, m=m)
         # G2M -> G1
-        cellid_1 = np.random.choice(ids_G2)
-        cellid_2 = np.random.choice(ids_G1)
-        prepare_CM_input_trajectory(os.path.join(output_path, 'G2M>G1', f'trajectory_{str(i).zfill(3)}'), \
+        prepare_CM_input_trajectory(metacells_ids31, \
+                                    os.path.join(output_path, 'G2M>G1', f'trajectory_{str(i).zfill(3)}'), \
                                     contact_file_path, stat_file_path,\
                                     cellid_1, cellid_2, n=n, m=m)
         
         
 if __name__ == "__main__":
-    out_file = "./ChromMovie-flow/outputs/md/test00"
-    stat_file_path = "./data/unique_cells_PATSKI_100.txt"
-    contact_file = "data/final_dataset_downsampled_100/filtered_ChIA-PET.bedpe"
-    cellid1, cellid2 = 'SCG0088_CTGTTAAAGTCACTAA-1', 'SCG0090_CATCATAAGTAAGTGG-1'
+    # input for 100 cells
+    # out_file = "./ChromMovie-flow/outputs/md/test00"
+    # stat_file_path = "./data/unique_cells_PATSKI_100.txt"
+    # contact_file = "data/final_dataset_downsampled_100/filtered_ChIA-PET.bedpe"
+    # cellid1, cellid2 = 'SCG0088_CTGTTAAAGTCACTAA-1', 'SCG0090_CATCATAAGTAAGTGG-1'
+    # cellid1 = 'SCG0089_TCCATGCTCTCCTCTT-1'
+    # cellid2 = 'SCG0090_GGAAACTCACTAAGAA-1'
+    # cellid3 = 'SCG0091_AAAGGCTCAGCGCTTG-1'
 
-    # cellids = get_traj_metacell_ids(stat_file_path, \
+    # cellids = get_traj_metacell_ids_linear(stat_file_path, \
     #                 'SCG0088_CTGTTAAAGTCACTAA-1', 'SCG0090_CATCATAAGTAAGTGG-1', n=3, m=10)
-    # plot_metacells(stat_file_path, cellids, save_path="./test00.png")
+    # plot_metacells(stat_file_path, cellids, save_path=None)
+
+    # input for 1000 cells
+    out_file = "./ChromMovie-flow/outputs/md/test01"
+    stat_file_path = "./data/unique_cells_PATSKI_1k.txt"
+    contact_file = "./data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe"
+
+    # cellid1 = 'SCG0090_GTGAGCGAGTGACCTG-1'
+    # cellid2 = 'SCG0090_TTGCTTTAGCTCCCTG-1'
+    # cellid3 = 'SCG0088_AGACTATGTCCGTGAG-1'
+    
+    # cellids = get_traj_metacell_ids_cubic(stat_file_path, \
+    #                 cellid1, cellid2, cellid3, n=5, m=10)
+    
+    # plot_metacells(stat_file_path, cellids[0], save_path='./cubic_test12.png')
+    # plot_metacells(stat_file_path, cellids[1], save_path='./cubic_test23.png')
+    # plot_metacells(stat_file_path, cellids[2], save_path='./cubic_test31.png')
 
     prepare_CM_input(out_file, contact_file, stat_file_path, n_traj=10, n=3, m=10)
+
