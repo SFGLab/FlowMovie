@@ -20,3 +20,11 @@ Flow Matching:
 Finally:
 * Analyze
 
+### Running ChromMovie for the ready config .yaml files
+
+Run this from ChromMovie folder:
+
+```{bash}
+for file in /home/baneckik/Documents/projects/2026_FM/ChromMovie-flow/configs/md/test01/*.yaml; do python3 ../ChromMovie/ChromMovie.py -i "$file"; done
+```
+
