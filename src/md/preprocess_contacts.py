@@ -1,4 +1,5 @@
 import os
+import shutil
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -205,7 +206,54 @@ def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2
                                     os.path.join(output_path, 'G2M>G1', f'trajectory_{str(i).zfill(3)}'), \
                                     contact_file_path, stat_file_path,\
                                     cellid_1, cellid_2, n=n, m=m)
-        
+
+
+def clean_directory(target_dir):
+    """
+    Deletes all the files in target_dir from the ChromMovie simulation except for the cif files of the structures from the last step.
+    All of the files in the target_dir are expected to contain a specific ChromMovie simulation output.
+    """
+    # Safety Check: Convert to absolute path and verify existence
+    target_dir = os.path.abspath(target_dir)
+    if not os.path.exists(target_dir):
+        print(f"Error: The directory '{target_dir}' does not exist.")
+        return
+
+    # Iterate through everything inside the target directory
+    for item in os.listdir(target_dir):
+        item_path = os.path.join(target_dir, item)
+
+        # Check if this is the frames_cif folder and delete all files except last step
+        if item == "frames_cif":
+            frames = os.listdir(item_path)
+            max_step = np.max([int(x.split("_")[0][4:]) for x in frames])
+            for frame in frames:
+                if not frame.startswith(f"step{str(max_step).zfill(3)}"):
+                    os.remove(os.path.join(item_path, frame))
+            continue
+
+        try:
+            # If it's a directory (and not our protected one), delete it and its contents
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            # If it's a file or a symlink, delete it
+            else:
+                os.remove(item_path)
+        except Exception as e:
+            print(f"[ERROR] Could not delete {item}: {e}")
+    # print(f"Folder {target_dir} cleared successfully")
+
+
+def clean_all_directories(target_dir):
+    """
+    Deletes all the files from the ChromMovie simulation except for the cif files of the structures from the last step.
+    This script does it for all of the subdirectories in target_dir folder. 
+    All of those subdirectories are expected to contain a specific ChromMovie simulation output.
+    """
+    sub_directories = os.listdir(target_dir)
+    for subdir in sub_directories:
+        clean_directory(os.path.join(target_dir, subdir))
+
         
 if __name__ == "__main__":
     # input for 100 cells
@@ -238,4 +286,9 @@ if __name__ == "__main__":
     # plot_metacells(stat_file_path, cellids[2], save_path='./cubic_test31.png')
 
     prepare_CM_input(out_file, contact_file, stat_file_path, n_traj=10, n=3, m=10)
+
+    # clean_all_directories("./outputs/trajectories/test01/G1>S")
+    # clean_all_directories("./outputs/trajectories/test01/S>G2M")
+    # clean_all_directories("./outputs/trajectories/test01/G2M>G1")
+    
 
