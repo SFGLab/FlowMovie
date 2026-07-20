@@ -1,4 +1,4 @@
-# ChromMovie-flow
+# FlowMovie
 
 [![License](https://img.shields.io/github/license/SFGLab/ChromMovie-flow)](LICENSE)
 
