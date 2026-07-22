@@ -1,0 +1,11 @@
+# dev folders:
+data
+models
+
+# notebooks:
+src/flow_matching/interpolant/.ipynb_checkpoints/
+src/md/.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+notebooks/__pycache__/
+
+
