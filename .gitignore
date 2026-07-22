@@ -8,4 +8,5 @@ src/md/.ipynb_checkpoints/
 src/md/__pycache__/
 notebooks/.ipynb_checkpoints/
 notebooks/__pycache__/
+notebooks/animation.gif
 

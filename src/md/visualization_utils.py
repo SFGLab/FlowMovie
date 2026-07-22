@@ -26,7 +26,7 @@ def get_chrom_sizes(resolution, chrom_sizes_path="../chrom_sizes/mm10.txt"):
     return chrom_sizes, ms
 
 
-def visualize_single_chrom(points, fig_show=True):
+def visualize_single_chrom(points, title="", fig_show=True):
     """
     Interactive plotly visualization of a single chromosome in the form of (m,3) np.array.
     Consecutive points (rows in points array) are assumed to be connected).
@@ -57,13 +57,13 @@ def visualize_single_chrom(points, fig_show=True):
     
     # Render plot
     fig = go.Figure(data=[scatter_trace, line_trace])
-    fig.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0, r=0, b=0, t=0))
+    fig.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0, r=0, b=0, t=40), title=title, showlegend=False)
 
     if fig_show: fig.show()
     return fig
 
 
-def visualize_whole_genome(points, resolution, diploid=False, chrom_sizes_path="../chrom_sizes/mm10.txt", p=0, fig_show=True):
+def visualize_whole_genome(points, resolution, diploid=False, chrom_sizes_path="../chrom_sizes/mm10.txt", p=0, title="", fig_show=True):
     """
     Interactive plotly visualization of a single chromosome in the form of (m,3) np.array.
     Consecutive points (rows in points array) within particular chromosomes (based on chrom_sizes_path), are assumed to be connected).
@@ -139,7 +139,7 @@ def visualize_whole_genome(points, resolution, diploid=False, chrom_sizes_path="
     
     # Render plot
     fig = go.Figure(data=[scatter_trace, line_trace])
-    fig.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0, r=0, b=0, t=0))
+    fig.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0, r=0, b=0, t=40), title=title, showlegend=False)
     
     if fig_show: fig.show()
     return fig
