@@ -26,10 +26,11 @@ def get_chrom_sizes(resolution, chrom_sizes_path="../chrom_sizes/mm10.txt"):
     return chrom_sizes, ms
 
 
-def visualize_single_chrom(points, title="", fig_show=True):
+def visualize_single_chrom(points, title="", fig_show=True, axis_range=None):
     """
     Interactive plotly visualization of a single chromosome in the form of (m,3) np.array.
     Consecutive points (rows in points array) are assumed to be connected).
+    axis_range is expected to be in the form of [x_min, x_max, y_min, y_max, z_min, z_max].
     """
     n = points.shape[0]
     edge_indices = np.vstack([[i, i+1] for i in range(n-1)])
@@ -45,7 +46,7 @@ def visualize_single_chrom(points, title="", fig_show=True):
     scatter_trace = go.Scatter3d(
         x=points[:, 0], y=points[:, 1], z=points[:, 2],
         mode='markers',
-        marker=dict(size=2, color=points[:, 2], colorscale='Viridis', opacity=0.8)
+        marker=dict(size=2, color=np.array(range(points.shape[0])), colorscale='Viridis', opacity=0.8)
     )
     
     line_trace = go.Scatter3d(
@@ -56,14 +57,26 @@ def visualize_single_chrom(points, title="", fig_show=True):
     )
     
     # Render plot
+    if axis_range is None:
+        axis_range_plot = [np.min(points[:,0]), np.max(points[:,0]),
+                           np.min(points[:,1]), np.max(points[:,1]),
+                           np.min(points[:,2]), np.max(points[:,2])]
+    else:
+        axis_range_plot = axis_range
     fig = go.Figure(data=[scatter_trace, line_trace])
-    fig.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0, r=0, b=0, t=40), title=title, showlegend=False)
+    fig.update_layout(scene=dict(
+            aspectmode='data',
+            xaxis=dict(range=[axis_range_plot[0], axis_range_plot[1]]),
+            yaxis=dict(range=[axis_range_plot[2], axis_range_plot[3]]),
+            zaxis=dict(range=[axis_range_plot[4], axis_range_plot[5]]),
+        ), 
+        margin=dict(l=0, r=0, b=0, t=40), title=title, showlegend=False)
 
     if fig_show: fig.show()
     return fig
 
 
-def visualize_whole_genome(points, resolution, diploid=False, chrom_sizes_path="../chrom_sizes/mm10.txt", p=0, title="", fig_show=True):
+def visualize_whole_genome(points, resolution, diploid=False, chrom_sizes_path="../chrom_sizes/mm10.txt", p=0, title="", fig_show=True, axis_range=None):
     """
     Interactive plotly visualization of a single chromosome in the form of (m,3) np.array.
     Consecutive points (rows in points array) within particular chromosomes (based on chrom_sizes_path), are assumed to be connected).
@@ -72,6 +85,7 @@ def visualize_whole_genome(points, resolution, diploid=False, chrom_sizes_path="
     If diploid==True the order of chromosomes is assumed to be chr1, chr1, chr2, chr2, chr3, ..., chrX, chrX.
     Parameter p signifies the percentage (integer from 0 to 100) of the points to exclude due to them lying to close to the center. 
     By default p=0, meaning that all of the points will be shown.
+    axis_range is expected to be in the form of [x_min, x_max, y_min, y_max, z_min, z_max].
     """
     _, ms = get_chrom_sizes(resolution, chrom_sizes_path)
     
@@ -138,8 +152,20 @@ def visualize_whole_genome(points, resolution, diploid=False, chrom_sizes_path="
     )
     
     # Render plot
+    if axis_range is None:
+        axis_range_plot = [np.min(points[:,0]), np.max(points[:,0]),
+                           np.min(points[:,1]), np.max(points[:,1]),
+                           np.min(points[:,2]), np.max(points[:,2])]
+    else:
+        axis_range_plot = axis_range
     fig = go.Figure(data=[scatter_trace, line_trace])
-    fig.update_layout(scene=dict(aspectmode='data'), margin=dict(l=0, r=0, b=0, t=40), title=title, showlegend=False)
+    fig.update_layout(scene=dict(
+            aspectmode='data',
+            xaxis=dict(range=[axis_range_plot[0], axis_range_plot[1]]),
+            yaxis=dict(range=[axis_range_plot[2], axis_range_plot[3]]),
+            zaxis=dict(range=[axis_range_plot[4], axis_range_plot[5]]),
+        ), 
+        margin=dict(l=0, r=0, b=0, t=40), title=title, showlegend=False)
     
     if fig_show: fig.show()
     return fig
