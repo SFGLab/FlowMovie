@@ -27,19 +27,19 @@ For creating ChromMovie simulations.
 Firstly, from `./src/md` folder prepare the data:
 
 ```{bash}
-python preprocess_contacts.py
+python preprocess_contacts.py -t test02 -s "../../data/unique_cells_PATSKI_1k.txt" -c "../../data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe" --n-traj 10 -n 3 -m 10
 ```
 
 Then prepare the configs:
 
 ```{bash}
-python prepare_CM_configs.py
+python prepare_CM_configs.py -t test02
 ```
 
 Finally in the `./scripts` folder run the following (might need to specify the configs directory and ChromMovie folder):
 
 ```{bash}
-./run_CM_simulations.sh
+./run_CM_simulations.sh ../configs/md/test02/ ../../ChromMovie
 ```
 
 Alternatively:

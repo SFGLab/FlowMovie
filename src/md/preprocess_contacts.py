@@ -7,6 +7,7 @@ from scipy.spatial import ConvexHull, distance_matrix
 from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 import seaborn as sns
+import argparse
 
 
 def get_diameter(points):
@@ -262,25 +263,81 @@ def clean_all_directories(target_dir):
         clean_directory(os.path.join(target_dir, subdir))
 
 
+def main():
+    parser = argparse.ArgumentParser(
+        description="Prepare CM input files for a test run."
+    )
+
+    # Default test name used to dynamically build the output directory path
+    default_test = "test02"
+
+    parser.add_argument(
+        "-t",
+        "--test-name",
+        type=str,
+        default=default_test,
+        help=f"Name of the test run (default: {default_test})",
+    )
+    parser.add_argument(
+        "-o",
+        "--out-file",
+        type=str,
+        default=f"../../data/md/{default_test}/CM_input/",
+        help="Path to output directory/file",
+    )
+    parser.add_argument(
+        "-s",
+        "--stat-file-path",
+        type=str,
+        default="../../data/unique_cells_PATSKI_1k.txt",
+        help="Path to unique cells stat file",
+    )
+    parser.add_argument(
+        "-c",
+        "--contact-file",
+        type=str,
+        default="../../data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe",
+        help="Path to contact file (.bedpe)",
+    )
+    parser.add_argument(
+        "--n-traj",
+        type=int,
+        default=10,
+        help="Number of trajectories (default: 10)",
+    )
+    parser.add_argument(
+        "-n",
+        type=int,
+        default=3,
+        help="Number of frames in each trajectory (default: 3)",
+    )
+    parser.add_argument(
+        "-m",
+        type=int,
+        default=10,
+        help="Number of cells in each frame (default: 10)",
+    )
+
+    args = parser.parse_args()
+
+    # Automatically update default output path if a custom test_name is passed
+    if (
+        args.test_name != default_test
+        and args.out_file == f"../../data/md/{default_test}/CM_input/"
+    ):
+        args.out_file = f"../../data/md/{args.test_name}/CM_input/"
+
+    prepare_CM_input(
+        output_path=args.out_file,
+        contact_file_path=args.contact_file,
+        stat_file_path=args.stat_file_path,
+        n_traj=args.n_traj,
+        n=args.n,
+        m=args.m,
+    )
+
+
 if __name__ == "__main__":
-
-    # input parameters:
-    test_name = 'test02'
-    out_file = f"../../data/md/{test_name}/CM_input/"
-    stat_file_path = "../../data/unique_cells_PATSKI_1k.txt"
-    contact_file = "../../data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe"
-
-    # cellid1 = 'SCG0090_GTGAGCGAGTGACCTG-1'
-    # cellid2 = 'SCG0090_TTGCTTTAGCTCCCTG-1'
-    # cellid3 = 'SCG0088_AGACTATGTCCGTGAG-1'
-    
-    # cellids = get_traj_metacell_ids_cubic(stat_file_path, \
-    #                 cellid1, cellid2, cellid3, n=5, m=10)
-    
-    # plot_metacells(stat_file_path, cellids[0], save_path='./cubic_test12.png')
-    # plot_metacells(stat_file_path, cellids[1], save_path='./cubic_test23.png')
-    # plot_metacells(stat_file_path, cellids[2], save_path='./cubic_test31.png')
-
-    prepare_CM_input(out_file, contact_file, stat_file_path, n_traj=10, n=3, m=10)
+    main()
     
 
