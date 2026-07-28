@@ -10,6 +10,9 @@ import seaborn as sns
 
 
 def get_diameter(points):
+    """
+    Calculates the diameter of the convex hull around a group of points (maximal distance between points).
+    """
     points = np.asarray(points)
     hull = ConvexHull(points)
     hull_points = points[hull.vertices]
@@ -75,6 +78,7 @@ def get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n=
     """
     Prepares a 3 lists of lists of cellids for a trajectories between cellid_1, cellid_2 and cellid_3.
     The resulting lists will be of length n, and each set of cells will be of size m.
+    The function additionally returns the 3 lists of (x,y) coordinates of the frame centers.
     """
     df = load_stat_file(stat_file_path)
 
@@ -111,7 +115,7 @@ def get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n=
         cellids = [x for _, x in sorted(zip(distances, cellid_list))][:m]
         metacell_ids31.append(cellids)
         
-    return metacell_ids12, metacell_ids23, metacell_ids31
+    return metacell_ids12, metacell_ids23, metacell_ids31, centers12, centers23, centers31
 
 
 def plot_metacells(stat_file_path, metacell_ids, save_path=None):
@@ -150,10 +154,9 @@ def plot_metacells(stat_file_path, metacell_ids, save_path=None):
         plt.show()
 
 
-def prepare_CM_input_trajectory(metacells_ids, output_path, contact_file_path, stat_file_path, cellid_1, cellid_2, n=2, m=10):
+def prepare_CM_input_trajectory(metacells_ids, output_path, contact_file_path):
     """
     Prepares the input for a single trajectory in a proper csv format suitable for ChromMovie simulations.
-    It takes parameters of particular trajectory as input (in particular start and end cell - cellid_1 and cellid_2).
     Contact data is specified through 'contact_file_path' parameter. 
     The input data is expected to be in bedpe format with an additional column specifying the cellid.
     The output csv files are saved into the 'output_path'.
@@ -164,7 +167,7 @@ def prepare_CM_input_trajectory(metacells_ids, output_path, contact_file_path, s
     df_contact = load_contact_data(contact_file_path)
     
     # print("Preparing csv contact files for the metacells...")
-    for i in range(n):
+    for i in range(len(metacells_ids)):
         df_metacell = df_contact[df_contact['cellid'].isin(metacells_ids[i])]
         df_metacell = df_metacell.drop('cellid', axis=1)
         df_metacell.to_csv(os.path.join(output_path, f'metacell_{str(i).zfill(3)}.csv'), index=False)
@@ -189,23 +192,26 @@ def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2
         cellid_2 = np.random.choice(ids_S)
         cellid_3 = np.random.choice(ids_G2)
 
-        metacells_ids12, metacells_ids23, metacells_ids31 = \
+        metacells_ids12, metacells_ids23, metacells_ids31, centers12, centers23, centers31 = \
             get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n, m)
         # G1 -> S
         prepare_CM_input_trajectory(metacells_ids12, \
-                                    os.path.join(output_path, 'G1>S', f'trajectory_{str(i).zfill(3)}'), \
-                                    contact_file_path, stat_file_path,\
-                                    cellid_1, cellid_2, n=n, m=m)
+                                    os.path.join(output_path, 'G1_to_S', f'trajectory_{str(i).zfill(3)}'), \
+                                    contact_file_path)
+        np.savetxt(os.path.join(output_path, 'G1_to_S', f'trajectory_{str(i).zfill(3)}', \
+                                    f'trajectory_{str(i).zfill(3)}_centers_coords.txt'), centers12)
         # S -> G2M
         prepare_CM_input_trajectory(metacells_ids23, \
-                                    os.path.join(output_path, 'S>G2M', f'trajectory_{str(i).zfill(3)}'), \
-                                    contact_file_path, stat_file_path,\
-                                    cellid_1, cellid_2, n=n, m=m)
+                                    os.path.join(output_path, 'S_to_G2M', f'trajectory_{str(i).zfill(3)}'), \
+                                    contact_file_path)
+        np.savetxt(os.path.join(output_path, 'S_to_G2M', f'trajectory_{str(i).zfill(3)}', \
+                                    f'trajectory_{str(i).zfill(3)}_centers_coords.txt'), centers23)
         # G2M -> G1
         prepare_CM_input_trajectory(metacells_ids31, \
-                                    os.path.join(output_path, 'G2M>G1', f'trajectory_{str(i).zfill(3)}'), \
-                                    contact_file_path, stat_file_path,\
-                                    cellid_1, cellid_2, n=n, m=m)
+                                    os.path.join(output_path, 'G2M_to_G1', f'trajectory_{str(i).zfill(3)}'), \
+                                    contact_file_path)
+        np.savetxt(os.path.join(output_path, 'G2M_to_G1', f'trajectory_{str(i).zfill(3)}', \
+                                    f'trajectory_{str(i).zfill(3)}_centers_coords.txt'), centers31)
 
 
 def clean_directory(target_dir):
@@ -221,32 +227,33 @@ def clean_directory(target_dir):
 
     # Iterate through everything inside the target directory
     for item in os.listdir(target_dir):
-        item_path = os.path.join(target_dir, item)
+        if not item.endswith("yaml"):
+            item_path = os.path.join(target_dir, item)
 
-        # Check if this is the frames_cif folder and delete all files except last step
-        if item == "frames_cif":
-            frames = os.listdir(item_path)
-            max_step = np.max([int(x.split("_")[0][4:]) for x in frames])
-            for frame in frames:
-                if not frame.startswith(f"step{str(max_step).zfill(3)}"):
-                    os.remove(os.path.join(item_path, frame))
-            continue
+            # Check if this is the frames_cif folder and delete all files except last step
+            if item == "frames_cif":
+                frames = os.listdir(item_path)
+                max_step = np.max([int(x.split("_")[0][4:]) for x in frames])
+                for frame in frames:
+                    if not frame.startswith(f"step{str(max_step).zfill(3)}"):
+                        os.remove(os.path.join(item_path, frame))
+                continue
 
-        try:
-            # If it's a directory (and not our protected one), delete it and its contents
-            if os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-            # If it's a file or a symlink, delete it
-            else:
-                os.remove(item_path)
-        except Exception as e:
-            print(f"[ERROR] Could not delete {item}: {e}")
+            try:
+                # If it's a directory (and not our protected one), delete it and its contents
+                if os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+                # If it's a file or a symlink, delete it
+                else:
+                    os.remove(item_path)
+            except Exception as e:
+                print(f"[ERROR] Could not delete {item}: {e}")
     # print(f"Folder {target_dir} cleared successfully")
 
 
 def clean_all_directories(target_dir):
     """
-    Deletes all the files from the ChromMovie simulation except for the cif files of the structures from the last step.
+    Deletes all the files from the ChromMovie simulation except for the cif files of the structures from the last step and the yaml configuration file.
     This script does it for all of the subdirectories in target_dir folder. 
     All of those subdirectories are expected to contain a specific ChromMovie simulation output.
     """
@@ -254,25 +261,14 @@ def clean_all_directories(target_dir):
     for subdir in sub_directories:
         clean_directory(os.path.join(target_dir, subdir))
 
-        
+
 if __name__ == "__main__":
-    # input for 100 cells
-    # out_file = "./ChromMovie-flow/outputs/md/test00"
-    # stat_file_path = "./data/unique_cells_PATSKI_100.txt"
-    # contact_file = "data/final_dataset_downsampled_100/filtered_ChIA-PET.bedpe"
-    # cellid1, cellid2 = 'SCG0088_CTGTTAAAGTCACTAA-1', 'SCG0090_CATCATAAGTAAGTGG-1'
-    # cellid1 = 'SCG0089_TCCATGCTCTCCTCTT-1'
-    # cellid2 = 'SCG0090_GGAAACTCACTAAGAA-1'
-    # cellid3 = 'SCG0091_AAAGGCTCAGCGCTTG-1'
 
-    # cellids = get_traj_metacell_ids_linear(stat_file_path, \
-    #                 'SCG0088_CTGTTAAAGTCACTAA-1', 'SCG0090_CATCATAAGTAAGTGG-1', n=3, m=10)
-    # plot_metacells(stat_file_path, cellids, save_path=None)
-
-    # input for 1000 cells
-    out_file = "./ChromMovie-flow/outputs/md/test01"
-    stat_file_path = "./data/unique_cells_PATSKI_1k.txt"
-    contact_file = "./data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe"
+    # input parameters:
+    test_name = 'test02'
+    out_file = f"../../data/md/{test_name}/CM_input/"
+    stat_file_path = "../../data/unique_cells_PATSKI_1k.txt"
+    contact_file = "../../data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe"
 
     # cellid1 = 'SCG0090_GTGAGCGAGTGACCTG-1'
     # cellid2 = 'SCG0090_TTGCTTTAGCTCCCTG-1'
@@ -286,9 +282,5 @@ if __name__ == "__main__":
     # plot_metacells(stat_file_path, cellids[2], save_path='./cubic_test31.png')
 
     prepare_CM_input(out_file, contact_file, stat_file_path, n_traj=10, n=3, m=10)
-
-    # clean_all_directories("./outputs/trajectories/test01/G1>S")
-    # clean_all_directories("./outputs/trajectories/test01/S>G2M")
-    # clean_all_directories("./outputs/trajectories/test01/G2M>G1")
     
 

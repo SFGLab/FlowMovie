@@ -4,11 +4,12 @@ import os
 
 if __name__ == "__main__":
 
-    test_name = 'test01'
-    template_path = "/home/baneckik/Documents/projects/2026_FM/ChromMovie-flow/configs/md/base_CM_config.yaml"
+    # input parameters:
+    test_name = 'test02'
+    template_path = "../../configs/md/base_CM_config.yaml"
     config_out_path = os.path.join("/".join(template_path.split("/")[:-1]), test_name)
-    input_directory = f"/home/baneckik/Documents/projects/2026_FM/ChromMovie-flow/outputs/md/{test_name}"
-    output_directory = f"/home/baneckik/Documents/projects/2026_FM/ChromMovie-flow/outputs/trajectories/{test_name}"
+    input_directory = f"/home/baneckik/Documents/projects/FlowMovie/data/md/{test_name}/CM_input/"
+    output_directory = f"/home/baneckik/Documents/projects/FlowMovie/data/md/{test_name}/CM_output/"
     target_extension = '.csv'
 
     # Create output directory if it doesn't exist
@@ -32,4 +33,6 @@ if __name__ == "__main__":
             with open(save_path, 'w') as f:
                 yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
 
-    print(f"Successfully generated configs in {output_directory}")
+    print(f"Successfully generated configs in {config_out_path}")
+
+    

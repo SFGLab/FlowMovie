@@ -22,9 +22,29 @@ Finally:
 
 ### Running ChromMovie for the ready config .yaml files
 
-Run this from ChromMovie folder:
+For creating ChromMovie simulations.
+
+Firstly, from `./src/md` folder prepare the data:
 
 ```{bash}
-for file in /home/baneckik/Documents/projects/2026_FM/ChromMovie-flow/configs/md/test01/*.yaml; do python3 ../ChromMovie/ChromMovie.py -i "$file"; done
+python preprocess_contacts.py
+```
+
+Then prepare the configs:
+
+```{bash}
+python prepare_CM_configs.py
+```
+
+Finally in the `./scripts` folder run the following (might need to specify the configs directory and ChromMovie folder):
+
+```{bash}
+./run_CM_simulations.sh
+```
+
+Alternatively:
+
+```{bash}
+for file in /home/baneckik/Documents/projects/2026_FM/FlowMovie/configs/md/test01/*.yaml; do python3 ../ChromMovie/ChromMovie.py -i "$file"; done
 ```
 
