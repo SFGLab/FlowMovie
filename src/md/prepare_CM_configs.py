@@ -1,7 +1,6 @@
 import yaml
 import os
 import argparse
-from pathlib import Path
 
 
 def prepare_CM_configs(test_name, template_path, CM_input_directory, CM_output_directory):
