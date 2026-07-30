@@ -1,6 +1,7 @@
 # dev folders:
 data
 models
+configs/md/test02/
 
 # notebooks:
 src/flow_matching/interpolant/.ipynb_checkpoints/
@@ -9,4 +10,4 @@ src/md/__pycache__/
 notebooks/.ipynb_checkpoints/
 notebooks/__pycache__/
 notebooks/animation.gif
-
+.vscode/

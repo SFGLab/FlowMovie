@@ -1,8 +1,10 @@
+import os
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 from tqdm import tqdm 
+from scipy.interpolate import CubicSpline, splev, splprep
 
 import io
 from PIL import Image
@@ -12,6 +14,13 @@ from PIL import Image
 # /home/baneckik/Programs/miniconda3/bin/python3.13 -m pip install -U "kaleido==0.2.1"
 import plotly 
 import kaleido
+
+
+def load_txt_coords(file_path):
+    """
+    Reads a space-separated text file of floating-point numbers with centers' coordinates into a 2D numpy array.
+    """
+    return np.loadtxt(file_path)
 
 
 def get_chrom_sizes(resolution, chrom_sizes_path="../chrom_sizes/mm10.txt"):
@@ -189,5 +198,126 @@ def create_gif(figs, gif_path, duration=100, width=600, height=600):
     )
 
 
+def get_smooth_trajectory(pts, m2=None):
+    """Fits a parametric cubic spline to 2D points (m, 2) and returns smooth (x, y) coordinates.
+    :m2: number of intermediary points of the smoothed trajectory.
+    """
+    x, y = pts[:, 0], pts[:, 1]
+    m = len(x)
+    if m2 is None:
+        m2 = m*3 + 1
 
+    t = np.array(range(m))
+    csX = CubicSpline(t, x)
+    csY = CubicSpline(t, y)
+
+    x_smooth = [csX(t) for t in np.linspace(0, m-1, m2)]
+    y_smooth = [csY(t) for t in np.linspace(0, m-1, m2)]
+        
+    return x_smooth, y_smooth
+
+
+def visualize_CM_input(CM_input_path, output_path):
+    """
+    
+    """
+    # Creating an output folder if does not exist
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    # Preparing centers coordinates as list 'centers'
+    # The list is of size 3 (for each phase transition), consisting of lists of size of the number of trajectories, 
+    # consisting of np.arrays of the centers of this trajectory.
+    phase_folders = os.listdir(CM_input_path)
+    centers_list = []
+    for phase_folder in phase_folders:
+        trajectories_folders = os.listdir(os.path.join(CM_input_path, phase_folder))
+        centers_phase = []
+        for traj_folder in trajectories_folders:
+            txt_coord_file = [x for x in os.listdir(os.path.join(CM_input_path, phase_folder, traj_folder)) if x.endswith(".txt")][0]
+            centers_traj = load_txt_coords(os.path.join(CM_input_path, phase_folder, traj_folder, txt_coord_file))
+            centers_phase.append(centers_traj)
+        centers_list.append(centers_phase)
+
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]  # Distinct colors for groups
+    group_names = ["Group 1", "Group 2", "Group 3"]
+
+    # --- A. Save individual plots for each group ---
+    for group_idx, group, phase_trans in zip(range(len(centers_list)), centers_list, phase_folders):
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+        for traj in group:
+            # Get interpolated points
+            x_smooth, y_smooth = get_smooth_trajectory(traj)
+
+            # Plot smooth spline curve
+            ax.plot(x_smooth, y_smooth, color=colors[group_idx], alpha=0.8, lw=2)
+            # Plot original waypoint dots
+            ax.scatter(
+                traj[:, 0],
+                traj[:, 1],
+                color=colors[group_idx],
+                s=15,
+                alpha=0.5,
+                zorder=3,
+            )
+
+        ax.set_title(
+            f"Trajectories - {" ".join(phase_trans.split("_"))}",
+            fontsize=14,
+            fontweight="bold",
+        )
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.grid(True, linestyle="--", alpha=0.5)
+
+        filename = os.path.join(output_path, f"trajectories_{phase_trans}.png")
+        plt.savefig(filename, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved: {filename}")
+
+
+    # --- B. Save combined plot containing all groups ---
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    for group_idx, group in enumerate(centers_list):
+        for i, traj in enumerate(group):
+            x_smooth, y_smooth = get_smooth_trajectory(traj)
+
+            # Attach label only to the first line of each group for clean legend
+            label = " ".join(phase_folders[group_idx].split("_")) if i == 0 else None
+
+            ax.plot(
+                x_smooth,
+                y_smooth,
+                color=colors[group_idx],
+                alpha=0.8,
+                lw=2,
+                label=label,
+            )
+            ax.scatter(
+                traj[:, 0],
+                traj[:, 1],
+                color=colors[group_idx],
+                s=12,
+                alpha=0.4,
+                zorder=3,
+            )
+
+    ax.set_title(
+        "All Trajectories Combined", fontsize=14, fontweight="bold"
+    )
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(title="Phase transitions", loc="best")
+
+    combined_filename = os.path.join(output_path, "trajectories_all_phases.png")
+    plt.savefig(combined_filename, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {combined_filename}")
+    
+
+if __name__ == "__main__":
+    visualize_CM_input("../../data/md/test02/CM_input", "../../data/md/test02/figures")
     
