@@ -219,7 +219,8 @@ def get_smooth_trajectory(pts, m2=None):
 
 def visualize_CM_input(CM_input_path, output_path):
     """
-    
+    Based on CM input path creates four plots and saves them in the output_path.
+    Three plots for each cell-cycle phase transition and one combining all three.
     """
     # Creating an output folder if does not exist
     if not os.path.exists(output_path):
