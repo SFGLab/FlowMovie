@@ -3,7 +3,10 @@ data
 models
 configs/md/test02/
 
-# notebooks:
+# setup
+FlowMovie.egg-info/
+
+# notebooks pycache and vscode:
 src/flow_matching/interpolant/.ipynb_checkpoints/
 src/md/.ipynb_checkpoints/
 src/md/__pycache__/
