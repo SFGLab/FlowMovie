@@ -10,7 +10,7 @@ def train_interpolant(pt_file_path, num_epochs=20, lr=1e-3, device="cuda" if tor
     dataset = TrajectoryDataset(pt_file_path)
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
     
-    input_dim = dataset.metadata["num_atoms"]  # K*3
+    input_dim = dataset.metadata["num_values"]  # K*3
     num_frames = dataset.metadata["num_frames"] # N
     
     model = PhiTransformer(input_dim=input_dim).to(device)
@@ -30,16 +30,16 @@ def train_interpolant(pt_file_path, num_epochs=20, lr=1e-3, device="cuda" if tor
             x0 = batch_trajectories[:, 0, :]   # First frame (B, K*3)
             x1 = batch_trajectories[:, -1, :]  # Last frame (B, K*3)
             
-            # 2. Sample random target frame indices i for each trajectory in batch
-            frame_indices = torch.randint(0, N, (B,), device=device)
+            # 2. Draw continuous float times t ~ Uniform(0, 1) for each trajectory
+            t = torch.rand((B, 1), device=device) # Shape: (B, 1), values in [0.0, 1.0)
+
+            # 3. Map continuous time t to closest integer frame indices in range [0, N - 1]
+            frame_indices = torch.round(t * (N - 1)).long().squeeze(1) # Shape: (B,)
             
-            # 3. Extract ground truth target frames x_target
+            # 4. Extract ground truth target frames x_target
             # Gathering x_target for each trajectory in batch
             x_target = batch_trajectories[torch.arange(B), frame_indices, :] # (B, K*3)
-            
-            # 4. Calculate continuous time t in [0, 1]
-            t = (frame_indices.float() / (N - 1)).unsqueeze(1) # (B, 1)
-            
+
             # 5. Predict Phi term with Transformer
             phi = model(x0, x1, t.squeeze(1)) # (B, K*3)
             

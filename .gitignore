@@ -6,11 +6,20 @@ configs/md/test02/
 # setup
 FlowMovie.egg-info/
 
-# notebooks pycache and vscode:
+# notebooks:
 src/flow_matching/interpolant/.ipynb_checkpoints/
 src/md/.ipynb_checkpoints/
-src/md/__pycache__/
 notebooks/.ipynb_checkpoints/
-notebooks/__pycache__/
-notebooks/animation.gif
+
+# vscode
 .vscode/
+
+# pycache
+src/md/__pycache__/
+src/flow_matching/interpolant/__pycache__/
+src/flow_matching/flow_matching/__pycache__/
+notebooks/__pycache__/
+
+# visualization
+notebooks/animation.gif
+
