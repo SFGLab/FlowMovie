@@ -49,7 +49,7 @@ def preprocess_chromatin_trajectories(CM_output_path, CM_input_path, output_file
     example_cif = [f for f in os.listdir(os.path.join(CM_output_traj_folders[0], 'frames_cif')) if f.endswith('.cif')][0]
     example_cif_shape = read_cif(os.path.join(CM_output_traj_folders[0], 'frames_cif', example_cif)).shape
     print(f"Each frame is of shape {example_cif_shape}.")
-    print(f"This amounts to K={example_cif_shape[0]} beads and K*3 = {example_cif_shape[0]*example_cif_shape[1]} values in total (+ 2 values for center coordinates).\n")
+    print(f"This amounts to K={example_cif_shape[0]} beads and K*3 = {example_cif_shape[0]*example_cif_shape[1]} values in total (+2 values for center coordinates).\n")
 
     for folder_CM_out, folder_CM_in in tqdm(zip(CM_output_traj_folders, CM_input_traj_folders), desc="Processing Trajectories"):
         # Identify all .cif files in chronological/ordered order (n structures)
@@ -70,7 +70,8 @@ def preprocess_chromatin_trajectories(CM_output_path, CM_input_path, output_file
         
         for cif_file, center_coords in zip(cif_files, centers_coords):
             try:
-                # Extract (K, 3) coordinates, flatten and merge with center coordinates
+                # Extract (K, 3) coordinates from cif_file, flatten them and merge with center 2D coordinates.
+                # Results coords variable is of (3*K+2,) shape.
                 coords = np.hstack([read_cif(cif_file).flatten(), center_coords])
                 
                 if beads_per_structure and coords.shape[0] != beads_per_structure:
@@ -80,18 +81,19 @@ def preprocess_chromatin_trajectories(CM_output_path, CM_input_path, output_file
             except Exception as e:
                 print(f"Error reading {cif_file}: {e}")
 
-        # Convert list of arrays to a single tensor (M, K, 3)
+        # Convert list of arrays to a single tensor (n, 3*K+2)
         if trajectory_coords:
             traj_tensor = torch.tensor(np.array(trajectory_coords), dtype=torch.float32)
             all_trajectories.append(traj_tensor)
 
     # Save as a dictionary for easy loading
     data_to_save = {
-        "trajectories": all_trajectories, # List of size N of (n, K*3) tensors
+        "trajectories": all_trajectories, # List of size N of (n, 3*K+2) tensors
         "metadata": {
             "num_trajectories": len(all_trajectories),
             "num_frames": all_trajectories[0].shape[0],
-            "num_atoms": all_trajectories[0].shape[1]
+            "num_values": all_trajectories[0].shape[1],
+            "num_beads": int((all_trajectories[0].shape[1]-2)/3)
         }
     }
     print(f"Final Torch file is of size {len(all_trajectories)} and shape {tuple(all_trajectories[0].shape)} each.")
