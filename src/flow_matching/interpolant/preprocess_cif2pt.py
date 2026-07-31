@@ -49,7 +49,7 @@ def preprocess_chromatin_trajectories(CM_output_path, CM_input_path, output_file
     example_cif = [f for f in os.listdir(os.path.join(CM_output_traj_folders[0], 'frames_cif')) if f.endswith('.cif')][0]
     example_cif_shape = read_cif(os.path.join(CM_output_traj_folders[0], 'frames_cif', example_cif)).shape
     print(f"Each frame is of shape {example_cif_shape}.")
-    print(f"This amounts to K={example_cif_shape[0]} beads and K*3 = {example_cif_shape[0]*example_cif_shape[1]} values in total (+2 values for center coordinates).\n")
+    print(f"This amounts to K={example_cif_shape[0]} beads and K*3={example_cif_shape[0]*example_cif_shape[1]} values in total (+2 values for center coordinates).\n")
 
     for folder_CM_out, folder_CM_in in tqdm(zip(CM_output_traj_folders, CM_input_traj_folders), desc="Processing Trajectories"):
         # Identify all .cif files in chronological/ordered order (n structures)
