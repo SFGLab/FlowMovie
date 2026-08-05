@@ -1,6 +1,0 @@
-chrom_sizes
-configs
-data
-models
-notebooks
-src
