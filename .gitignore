@@ -1,6 +1,7 @@
 # dev folders:
 data
 models
+results
 configs/md/test02/
 
 # setup

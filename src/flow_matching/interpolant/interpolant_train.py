@@ -67,3 +67,12 @@ if __name__ == "__main__":
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     trained_model = train_interpolant(data_path)
 
+    # Save trained model:
+    model_path = f"../../../models/interpolant/{test_name}_interp.pt"
+    checkpoint = {
+        "model_state_dict": trained_model.state_dict(),
+        "input_dim": trained_model.input_dim,  # e.g., K * 3
+    }
+    torch.save(checkpoint, model_path)
+    print(f"Model saved successfully to {model_path}")
+    
