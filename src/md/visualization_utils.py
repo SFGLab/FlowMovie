@@ -87,7 +87,7 @@ def visualize_single_chrom(points, title="", fig_show=True, axis_range=None):
 
 def visualize_whole_genome(points, resolution, diploid=False, chrom_sizes_path="../chrom_sizes/mm10.txt", p=0, title="", fig_show=True, axis_range=None):
     """
-    Interactive plotly visualization of a single chromosome in the form of (m,3) np.array.
+    Interactive plotly visualization of a whole genome structure in the form of (m,3) np.array.
     Consecutive points (rows in points array) within particular chromosomes (based on chrom_sizes_path), are assumed to be connected).
     
     If diploid==False only a single chromosome of each pair is assumed starting from chr1 and ending on chrX.

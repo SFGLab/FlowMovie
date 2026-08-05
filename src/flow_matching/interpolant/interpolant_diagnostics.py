@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from interpolant_DataLoader import TrajectoryDataset
 from interpolant import PhiTransformer
 
+from src.md.visualization_utils import visualize_whole_genome, create_gif
 
 # ---------------------------------------------------------
 # 1. Prediction Helper Function
@@ -28,6 +29,29 @@ def evaluate_trajectory(model, x0, x1, num_time_steps=100, device="cpu"):
     mu_pred = (1 - t_steps) * x0_exp + t_steps * x1_exp + t_steps * (1 - t_steps) * phi_pred
     
     return t_steps.cpu().numpy(), mu_pred.cpu().numpy(), phi_pred.cpu().numpy()
+
+
+@torch.no_grad()
+def predict_mu(model, x0, x1, t):
+    """
+    x0: Tensor of shape (Batch, K*3)
+    x1: Tensor of shape (Batch, K*3)
+    t:  Scalar or Tensor of shape (Batch, 1) with values in [0, 1]
+    """
+    model.eval()
+    
+    # Format t as a tensor matching batch size
+    if not isinstance(t, torch.Tensor):
+        t = torch.tensor([t], dtype=torch.float32, device=x0.device)
+    if t.ndim == 1:
+        t = t.unsqueeze(1) # (Batch, 1)
+
+    # Predict Phi term
+    phi = model(x0, x1, t.squeeze(1))
+    
+    # Construct mu(t) = (1-t)*x0 + t*x1 + t*(1-t)*Phi
+    mu = (1 - t) * x0 + t * x1 + t * (1 - t) * phi
+    return mu
 
 # ---------------------------------------------------------
 # 2. Main Plotting Routine
@@ -120,6 +144,46 @@ def run_diagnostics(model_path, data_path, output_path, num_samples=5, time_reso
     if plot_show: plt.show()
     print("Diagnostics plot saved as 'model_diagnostics.png'")
 
+
+def run_diagnostics_plot(model_path, data_path, output_path):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    # Load model checkpoint
+    checkpoint = torch.load(model_path, map_location=device)
+    model = PhiTransformer(input_dim=checkpoint["input_dim"]).to(device)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.eval()
+
+    # Load dataset
+    data = torch.load(data_path)
+    
+    # get the first input:
+    trajectory_id = 0
+    trajectories = data["trajectories"]
+    traj = trajectories[trajectory_id].to(device)
+    N, D = traj.shape
+
+    x0 = traj[0:1, :]   # First frame (1, K*3)
+    x1 = traj[-1:, :]  # Last frame (1, K*3)
+
+    # Predict dense trajectory
+    num_time_steps = 20
+    t_grid, mu_pred, phi_pred = evaluate_trajectory(model, x0, x1, num_time_steps=num_time_steps, device=device)
+
+    figs = []
+    for i in range(num_time_steps):
+        points = mu_pred[i,:-2].reshape(-1, 3)
+        fig = visualize_whole_genome(points, resolution=2000_000, diploid=True, chrom_sizes_path="../../../chrom_sizes/mm10.txt", 
+                                     p=40, title=f"Timepoint {i}/{num_time_steps}", fig_show=False, axis_range=None)
+        figs.append(fig)
+
+    gif_path = os.path.join(output_path, "model_diagnostics.gif")
+    create_gif(figs, gif_path, duration=100, width=600, height=600)    
+
+
 # Execute Script
 if __name__ == "__main__":
 
@@ -129,4 +193,7 @@ if __name__ == "__main__":
     model_path = f"../../../models/interpolant/{test_name}_interp.pt"
     output_path = f"../../../results/interpolant/{test_name}/"
 
-    run_diagnostics(model_path, data_path, output_path)
+    # run_diagnostics(model_path, data_path, output_path)
+
+    run_diagnostics_plot(model_path, data_path, output_path)
+        

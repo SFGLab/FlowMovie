@@ -19,6 +19,7 @@ notebooks/.ipynb_checkpoints/
 src/md/__pycache__/
 src/flow_matching/interpolant/__pycache__/
 src/flow_matching/flow_matching/__pycache__/
+src/flow_matching/flow_matching/__pycache__/FM_model.cpython-313.pyc
 notebooks/__pycache__/
 
 # visualization
