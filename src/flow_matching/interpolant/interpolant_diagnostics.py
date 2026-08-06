@@ -185,10 +185,14 @@ def run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=0):
     # plot_diagnostics_gif(mu_pred, output_path)
 
     print("Plotting consecutive bead distance distribution...")
-    plot_consecutive_bead_distr(mu_pred, output_path, plot_show=False)
+    # plot_consecutive_bead_distr(mu_pred, output_path, plot_show=False)
 
     print("Plotting consecutive bead angle distribution...")
-    plot_consecutive_angle_distr(mu_pred, output_path, plot_show=False)
+    # plot_consecutive_angle_distr(mu_pred, output_path, plot_show=False)
+
+    print("Plotting RMSD plot...")
+    plot_rmsd(mu_pred, traj, output_path, plot_show=False)
+
     print("Diagnostic plots completed.")
 
 
@@ -437,6 +441,41 @@ def plot_consecutive_angle_distr(mu_pred, output_path, plot_show=True, resolutio
     plt.grid(True, linestyle=":", alpha=0.6)
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, "model_consecutive_angle_distr2.png"), dpi=300)
+    if plot_show: plt.show()
+
+
+def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=True):
+    """
+    Creates a heatmap of RMSD values between the inferred trajectory and original structures from ChromMovie simulation.
+    """
+    list_pred = [mu_pred[i,:-2].reshape(-1, 3) for i in range(mu_pred.shape[0])]
+    list_orig = [orig_traj[i,:-2].reshape(-1, 3) for i in range(orig_traj.shape[0])]
+
+    # Convert lists to 3D arrays: (M, K, 3) and (N, K, 3)
+    A = np.array(list_pred)
+    B = np.array(list_orig)
+
+    # Vectorized pairwise distance calculation via broadcasting
+    # Shape shift: (M, 1, K, 3) - (1, N, K, 3) -> (M, N, K, 3)
+    diff = A[:, None, :, :] - B[None, :, :, :]
+    squared_distances = np.sum(diff**2, axis=-1)  # Shape: (M, N, K)
+    rmsd_matrix = np.sqrt(np.mean(squared_distances, axis=-1))  # Shape: (M, N)
+
+    # 3. Plot Heatmap
+    plt.figure(figsize=(9, 7))
+    sns.heatmap(
+        rmsd_matrix,
+        cmap="RdYlGn_r",
+        xticklabels=1,
+        yticklabels=1,
+        cbar_kws={"label": "RMSD"},
+    )
+
+    plt.xlabel("List Original Trajectory Structure Index")
+    plt.ylabel("List Model Trajectory Index")
+    plt.title("Pairwise (All-vs-All) RMSD Heatmap")
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "model_RMSD.png"), dpi=300)
     if plot_show: plt.show()
 
 # Execute Script
