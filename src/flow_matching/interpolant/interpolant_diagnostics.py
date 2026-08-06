@@ -1,13 +1,15 @@
 import os
 import torch
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
 from interpolant_DataLoader import TrajectoryDataset
 from interpolant import PhiTransformer
 
-from src.md.visualization_utils import visualize_whole_genome, create_gif
+from src.md.visualization_utils import visualize_whole_genome, create_gif, get_chrom_sizes
 
 # ---------------------------------------------------------
 # 1. Prediction Helper Function
@@ -57,6 +59,10 @@ def predict_mu(model, x0, x1, t):
 # 2. Main Plotting Routine
 # ---------------------------------------------------------
 def run_diagnostics(model_path, data_path, output_path, num_samples=5, time_resolution=100, plot_show=True):
+    """
+    Creates a diagnostic plot for the traned model. The plot includes the comparison of the trajectory of an example bead,
+    interpolant phi magnitude (Rg) as well as the distribution of errors.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if not os.path.exists(output_path):
@@ -145,9 +151,12 @@ def run_diagnostics(model_path, data_path, output_path, num_samples=5, time_reso
     print("Diagnostics plot saved as 'model_diagnostics.png'")
 
 
-def run_diagnostics_plot(model_path, data_path, output_path):
+def run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=0):
+    """
+    Wrapper funciton that runs ploting functions.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
@@ -161,27 +170,159 @@ def run_diagnostics_plot(model_path, data_path, output_path):
     data = torch.load(data_path)
     
     # get the first input:
-    trajectory_id = 0
     trajectories = data["trajectories"]
     traj = trajectories[trajectory_id].to(device)
     N, D = traj.shape
 
-    x0 = traj[0:1, :]   # First frame (1, K*3)
-    x1 = traj[-1:, :]  # Last frame (1, K*3)
+    x0 = traj[0:1, :]   # First frame (1, K*3+2)
+    x1 = traj[-1:, :]  # Last frame (1, K*3+2)
 
     # Predict dense trajectory
-    num_time_steps = 20
-    t_grid, mu_pred, phi_pred = evaluate_trajectory(model, x0, x1, num_time_steps=num_time_steps, device=device)
+    t_grid, mu_pred, phi_pred = evaluate_trajectory(model, x0, x1, num_time_steps=20, device=device)
 
+    # Preparing diagnostics
+    print("Ploting diagnostics plot...")
+    # plot_diagnostics_gif(mu_pred, output_path)
+
+    print("Plotting consecutive bead distribution...")
+    plot_consecutive_bead_distr(mu_pred, output_path, plot_show=False)
+
+    print("Diagnostic plots completed.")
+
+def plot_diagnostics_gif(mu_pred, output_path):
+    """
+    Creates a trajectory gif based on a trajectory_id.
+    """
+    num_time_steps = mu_pred.shape[0]
     figs = []
     for i in range(num_time_steps):
-        points = mu_pred[i,:-2].reshape(-1, 3)
+        points = mu_pred[i,:-2].reshape(-1, 3) # of shape (K, 3)
         fig = visualize_whole_genome(points, resolution=2000_000, diploid=True, chrom_sizes_path="../../../chrom_sizes/mm10.txt", 
                                      p=40, title=f"Timepoint {i}/{num_time_steps}", fig_show=False, axis_range=None)
         figs.append(fig)
 
     gif_path = os.path.join(output_path, "model_diagnostics.gif")
     create_gif(figs, gif_path, duration=100, width=600, height=600)    
+
+
+def get_indices_of_nonconsecutive(resolution, diploid=True, chrom_sizes_path="../chrom_sizes/mm10.txt"):
+    """
+    Calculates a list of indices of beads that are the last bead in a chromosome
+    (the ones whose successor is not to be counted as consecutive bead).
+    """
+    _, ms = get_chrom_sizes(resolution, chrom_sizes_path)
+
+    k = 0
+    nonconsec_indices = []
+    k_ploid = 2 if diploid else 1
+    for i in range(len(ms)):
+        for _ in range(k_ploid):
+            nonconsec_indices.append(k+ms[i]-1)
+            k += ms[i]
+        
+    return nonconsec_indices
+
+
+def get_indices_of_consecutive(resolution, diploid=True, chrom_sizes_path="../chrom_sizes/mm10.txt"):
+    """
+    Calculates a list of indices of beads that are not the last bead in a chromosome
+    (the ones whose successor is to be counted as consecutive bead).
+    """
+    nonconsec_indices = get_indices_of_nonconsecutive(resolution, diploid, chrom_sizes_path)
+    consec_indices = [i for i in range(nonconsec_indices[-1]+1) if i not in nonconsec_indices]
+    
+    return consec_indices
+
+
+def plot_consecutive_bead_distr(mu_pred, output_path, plot_show=True, resolution=2_000_000, diploid=True, chrom_sizes_path="../../../chrom_sizes/mm10.txt"):
+    """
+    Creates two plots tracking the consecutive bead distribution across mu_pred.
+    """
+    data_list = [mu_pred[i,:-2].reshape(-1, 3) for i in range(mu_pred.shape[0])]
+    distance_history = [[np.linalg.norm(arr[i] - arr[i+1]) for i in range(arr.shape[0]-1)] for arr in data_list]
+    consec_dists = get_indices_of_consecutive(resolution, diploid, chrom_sizes_path)
+    distance_history = [[di for i, di in enumerate(d) if i in consec_dists] for d in distance_history]
+
+    # 1. Stack distances into a 2D histogram matrix (Bins vs Time)
+    num_bins = 50
+    hist_matrix = []
+
+    # Global min/max to ensure consistent binning across time
+    min_dist = np.min(distance_history)
+    max_dist = np.max(distance_history)
+    bin_edges = np.linspace(min_dist, max_dist, num_bins + 1)
+
+    for dists in distance_history:
+        counts, _ = np.histogram(dists, bins=bin_edges, density=True)
+        hist_matrix.append(counts)
+
+    hist_matrix = np.array(hist_matrix).T  # Shape: (num_bins, time_steps)
+
+    # 2. Plot the Heatmap
+    plt.figure(figsize=(10, 6))
+    plt.imshow(
+        hist_matrix, 
+        aspect='auto', 
+        origin='lower',
+        extent=[0, len(data_list), bin_edges[0], bin_edges[-1]],
+        cmap='viridis'
+    )
+
+    plt.colorbar(label='Probability Density')
+    plt.xlabel('Time Step / Array Index')
+    plt.ylabel('Distance Between Consecutive Points')
+    plt.title('Distribution of Consecutive Point Distances Over Time')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "model_consecutive_bead_distr1.png"), dpi=300)
+    if plot_show: plt.show()
+
+    # 1. Calculate statistics for each time step
+    times = np.arange(len(distance_history))
+
+    means = [np.mean(d) for d in distance_history]
+    medians = [np.median(d) for d in distance_history]
+    p2_5 = [np.percentile(d, 2.5) for d in distance_history]
+    p97_5 = [np.percentile(d, 97.5) for d in distance_history]
+    mins = [np.min(d) for d in distance_history]
+    maxs = [np.max(d) for d in distance_history]
+
+    # 2. Plot lines and shaded region intervals
+    plt.figure(figsize=(10, 5))
+
+    # Outer range: Min to Max
+    plt.fill_between(
+        times, mins, maxs, color="blue", alpha=0.1, label="Full Range (Min–Max)"
+    )
+
+    # Inner 95% Interval: 2.5th to 97.5th Percentile
+    plt.fill_between(
+        times,
+        p2_5,
+        p97_5,
+        color="blue",
+        alpha=0.25,
+        label="95% Interval (2.5%–97.5%)",
+    )
+
+    # Central Trends
+    plt.plot(times, medians, label="Median Distance", color="blue", linewidth=2)
+    plt.plot(
+        times,
+        means,
+        label="Mean Distance",
+        color="navy",
+        linestyle="--",
+        linewidth=1.5,
+    )
+
+    plt.xlabel("Time Step / Array Index")
+    plt.ylabel("Distance Between Consecutive Points")
+    plt.title("Summary Statistics of Point Distances Over Time")
+    plt.legend(loc="upper left")
+    plt.grid(True, linestyle=":", alpha=0.6)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "model_consecutive_bead_distr2.png"), dpi=300)
+    if plot_show: plt.show()
 
 
 # Execute Script
@@ -193,7 +334,7 @@ if __name__ == "__main__":
     model_path = f"../../../models/interpolant/{test_name}_interp.pt"
     output_path = f"../../../results/interpolant/{test_name}/"
 
-    # run_diagnostics(model_path, data_path, output_path)
+    # run_diagnostics(model_path, data_path, output_path, plot_show=True)
 
-    run_diagnostics_plot(model_path, data_path, output_path)
+    run_diagnostics_plots(model_path, data_path, output_path)
         
