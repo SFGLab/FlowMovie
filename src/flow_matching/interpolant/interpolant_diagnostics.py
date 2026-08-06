@@ -184,10 +184,13 @@ def run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=0):
     print("Ploting diagnostics plot...")
     # plot_diagnostics_gif(mu_pred, output_path)
 
-    print("Plotting consecutive bead distribution...")
+    print("Plotting consecutive bead distance distribution...")
     plot_consecutive_bead_distr(mu_pred, output_path, plot_show=False)
 
+    print("Plotting consecutive bead angle distribution...")
+    plot_consecutive_angle_distr(mu_pred, output_path, plot_show=False)
     print("Diagnostic plots completed.")
+
 
 def plot_diagnostics_gif(mu_pred, output_path):
     """
@@ -243,7 +246,7 @@ def plot_consecutive_bead_distr(mu_pred, output_path, plot_show=True, resolution
     consec_dists = get_indices_of_consecutive(resolution, diploid, chrom_sizes_path)
     distance_history = [[di for i, di in enumerate(d) if i in consec_dists] for d in distance_history]
 
-    # 1. Stack distances into a 2D histogram matrix (Bins vs Time)
+    # Stack distances into a 2D histogram matrix (Bins vs Time)
     num_bins = 50
     hist_matrix = []
 
@@ -258,7 +261,7 @@ def plot_consecutive_bead_distr(mu_pred, output_path, plot_show=True, resolution
 
     hist_matrix = np.array(hist_matrix).T  # Shape: (num_bins, time_steps)
 
-    # 2. Plot the Heatmap
+    # Plot the Heatmap
     plt.figure(figsize=(10, 6))
     plt.imshow(
         hist_matrix, 
@@ -276,7 +279,7 @@ def plot_consecutive_bead_distr(mu_pred, output_path, plot_show=True, resolution
     plt.savefig(os.path.join(output_path, "model_consecutive_bead_distr1.png"), dpi=300)
     if plot_show: plt.show()
 
-    # 1. Calculate statistics for each time step
+    # Calculate statistics for each time step
     times = np.arange(len(distance_history))
 
     means = [np.mean(d) for d in distance_history]
@@ -286,7 +289,7 @@ def plot_consecutive_bead_distr(mu_pred, output_path, plot_show=True, resolution
     mins = [np.min(d) for d in distance_history]
     maxs = [np.max(d) for d in distance_history]
 
-    # 2. Plot lines and shaded region intervals
+    # Plot lines and shaded region intervals
     plt.figure(figsize=(10, 5))
 
     # Outer range: Min to Max
@@ -324,6 +327,117 @@ def plot_consecutive_bead_distr(mu_pred, output_path, plot_show=True, resolution
     plt.savefig(os.path.join(output_path, "model_consecutive_bead_distr2.png"), dpi=300)
     if plot_show: plt.show()
 
+
+def compute_triplet_angles(arr, degrees=True):
+    # Form vectors pointing from vertex p_i to p_{i-1} and p_{i+1}
+    u = arr[:-2] - arr[1:-1]  # Vector to previous point (K-2, 3)
+    v = arr[2:] - arr[1:-1]   # Vector to next point (K-2, 3)
+    
+    # Compute dot products and vector norms along axis 1
+    dot_products = np.einsum('ij,ij->i', u, v)
+    norms_u = np.linalg.norm(u, axis=1)
+    norms_v = np.linalg.norm(v, axis=1)
+    
+    # Cosine theta with clipping to handle floating-point inaccuracies
+    cos_theta = dot_products / (norms_u * norms_v)
+    cos_theta = np.clip(cos_theta, -1.0, 1.0)
+    
+    angles = np.arccos(cos_theta)
+    
+    return np.degrees(angles) if degrees else angles
+
+    # Compute across your list of time-step arrays
+    angle_history = [compute_triplet_angles(arr) for arr in data_list]
+
+
+def plot_consecutive_angle_distr(mu_pred, output_path, plot_show=True, resolution=2_000_000, diploid=True, chrom_sizes_path="../../../chrom_sizes/mm10.txt"):
+    """
+    Creates two plots tracking the consecutive bead distribution across mu_pred.
+    """
+    data_list = [mu_pred[i,:-2].reshape(-1, 3) for i in range(mu_pred.shape[0])]
+    angle_history = [compute_triplet_angles(arr) for arr in data_list]
+    nonconsec_dists = get_indices_of_consecutive(resolution, diploid, chrom_sizes_path)
+    angle_history = [[di for i, di in enumerate(d) if i in nonconsec_dists or i+1 in nonconsec_dists] for d in angle_history]
+
+    # Stack distances into a 2D histogram matrix (Bins vs Time)
+    num_bins = 50
+    hist_matrix = []
+
+    # Global min/max to ensure consistent binning across time
+    min_dist, max_dist = 0, 180
+    bin_edges = np.linspace(min_dist, max_dist, num_bins + 1)
+
+    for dists in angle_history:
+        counts, _ = np.histogram(dists, bins=bin_edges, density=True)
+        hist_matrix.append(counts)
+
+    hist_matrix = np.array(hist_matrix).T  # Shape: (num_bins, time_steps)
+
+    # Plot the Heatmap
+    plt.figure(figsize=(10, 6))
+    plt.imshow(
+        hist_matrix, 
+        aspect='auto', 
+        origin='lower',
+        extent=[0, len(data_list), bin_edges[0], bin_edges[-1]],
+        cmap='viridis'
+    )
+
+    plt.colorbar(label='Probability Density')
+    plt.xlabel('Time Step / Array Index')
+    plt.ylabel('Angle Between Consecutive Triplets of Points')
+    plt.title('Distribution of Consecutive Point Angles Over Time')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "model_consecutive_angle_distr1.png"), dpi=300)
+    if plot_show: plt.show()
+
+    # Calculate statistics for each time step
+    times = np.arange(len(angle_history))
+
+    means = [np.mean(d) for d in angle_history]
+    medians = [np.median(d) for d in angle_history]
+    p2_5 = [np.percentile(d, 2.5) for d in angle_history]
+    p97_5 = [np.percentile(d, 97.5) for d in angle_history]
+    mins = [np.min(d) for d in angle_history]
+    maxs = [np.max(d) for d in angle_history]
+
+    # Plot lines and shaded region intervals
+    plt.figure(figsize=(10, 5))
+
+    # Outer range: Min to Max
+    plt.fill_between(
+        times, mins, maxs, color="blue", alpha=0.1, label="Full Range (Min–Max)"
+    )
+
+    # Inner 95% Interval: 2.5th to 97.5th Percentile
+    plt.fill_between(
+        times,
+        p2_5,
+        p97_5,
+        color="blue",
+        alpha=0.25,
+        label="95% Interval (2.5%–97.5%)",
+    )
+
+    # Central Trends
+    plt.plot(times, medians, label="Median Distance", color="blue", linewidth=2)
+    plt.plot(
+        times,
+        means,
+        label="Mean Distance",
+        color="navy",
+        linestyle="--",
+        linewidth=1.5,
+    )
+
+    plt.xlabel("Time Step / Array Index")
+    plt.ylabel("Angles Between Consecutive Triplets of Points")
+    plt.title("Summary Statistics of Point Angles Over Time")
+    plt.legend(loc="upper left")
+    plt.grid(True, linestyle=":", alpha=0.6)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "model_consecutive_angle_distr2.png"), dpi=300)
+    if plot_show: plt.show()
 
 # Execute Script
 if __name__ == "__main__":
