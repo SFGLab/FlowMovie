@@ -58,7 +58,58 @@ def predict_mu(model, x0, x1, t):
 # ---------------------------------------------------------
 # 2. Main Plotting Routine
 # ---------------------------------------------------------
-def run_diagnostics(model_path, data_path, output_path, num_samples=5, time_resolution=100, plot_show=True):
+def run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=0, plot_show=False):
+    """
+    Wrapper function that starts all of the ploting functions.
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    # Load model checkpoint
+    checkpoint = torch.load(model_path, map_location=device)
+    model = PhiTransformer(input_dim=checkpoint["input_dim"]).to(device)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.eval()
+
+    # Load dataset
+    data = torch.load(data_path)
+    
+    # get the first input:
+    trajectories = data["trajectories"]
+    traj = trajectories[trajectory_id].to(device)
+    N, D = traj.shape
+
+    x0 = traj[0:1, :]   # First frame (1, K*3+2)
+    x1 = traj[-1:, :]  # Last frame (1, K*3+2)
+
+    # Predict dense trajectory
+    t_grid, mu_pred, phi_pred = evaluate_trajectory(model, x0, x1, num_time_steps=20, device=device)
+
+    # Preparing diagnostics
+    print("Ploting diagnostics plot...")
+    plot_diagnostics(model_path, data_path, output_path, trajectory_id=trajectory_id, plot_show=plot_show)
+
+    print("Plotting consecutive bead distance distribution plots...")
+    plot_consecutive_bead_distr(mu_pred, output_path, plot_show=plot_show)
+
+    print("Plotting consecutive bead angle distribution plots...")
+    plot_consecutive_angle_distr(mu_pred, output_path, plot_show=plot_show)
+
+    print("Plotting RMSD plots...")
+    plot_rmsd(mu_pred, traj, output_path, plot_show=plot_show)
+
+    print("Plotting 2D embedding plot...")
+    plot_2D_map(mu_pred, traj, output_path, plot_show=plot_show)
+
+    print("Ploting diagnostics gif...")
+    # plot_diagnostics_gif(mu_pred, output_path)
+
+    print("Diagnostic plots completed.")
+
+
+def plot_diagnostics(model_path, data_path, output_path, num_samples=5, time_resolution=100, trajectory_id=0, plot_show=False):
     """
     Creates a diagnostic plot for the traned model. The plot includes the comparison of the trajectory of an example bead,
     interpolant phi magnitude (Rg) as well as the distribution of errors.
@@ -106,7 +157,7 @@ def run_diagnostics(model_path, data_path, output_path, num_samples=5, time_reso
         all_t_mses.append(frame_mse)
 
         # Plot 1: Coordinate Trajectories (Atom 0, X/Y/Z coords) for 1 sample
-        if idx == 0:
+        if idx == trajectory_id:
             axes[0, 0].set_title("Ground Truth vs Predicted (Sample 0, Atom 0)")
             for coord_idx, label in enumerate(['X', 'Y', 'Z']):
                 axes[0, 0].plot(t_grid, gt_traj[:, coord_idx], '--', label=f'GT {label}')
@@ -149,51 +200,6 @@ def run_diagnostics(model_path, data_path, output_path, num_samples=5, time_reso
     plt.savefig(os.path.join(output_path, "model_diagnostics.png"), dpi=300)
     if plot_show: plt.show()
     print("Diagnostics plot saved as 'model_diagnostics.png'")
-
-
-def run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=0):
-    """
-    Wrapper funciton that runs ploting functions.
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-
-    # Load model checkpoint
-    checkpoint = torch.load(model_path, map_location=device)
-    model = PhiTransformer(input_dim=checkpoint["input_dim"]).to(device)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.eval()
-
-    # Load dataset
-    data = torch.load(data_path)
-    
-    # get the first input:
-    trajectories = data["trajectories"]
-    traj = trajectories[trajectory_id].to(device)
-    N, D = traj.shape
-
-    x0 = traj[0:1, :]   # First frame (1, K*3+2)
-    x1 = traj[-1:, :]  # Last frame (1, K*3+2)
-
-    # Predict dense trajectory
-    t_grid, mu_pred, phi_pred = evaluate_trajectory(model, x0, x1, num_time_steps=20, device=device)
-
-    # Preparing diagnostics
-    print("Ploting diagnostics plot...")
-    # plot_diagnostics_gif(mu_pred, output_path)
-
-    print("Plotting consecutive bead distance distribution plots...")
-    # plot_consecutive_bead_distr(mu_pred, output_path, plot_show=False)
-
-    print("Plotting consecutive bead angle distribution plots...")
-    # plot_consecutive_angle_distr(mu_pred, output_path, plot_show=False)
-
-    print("Plotting RMSD plots...")
-    plot_rmsd(mu_pred, traj, output_path, plot_show=False)
-
-    print("Diagnostic plots completed.")
 
 
 def plot_diagnostics_gif(mu_pred, output_path):
@@ -241,7 +247,7 @@ def get_indices_of_consecutive(resolution, diploid=True, chrom_sizes_path="../ch
     return consec_indices
 
 
-def plot_consecutive_bead_distr(mu_pred, output_path, plot_show=True, resolution=2_000_000, diploid=True, chrom_sizes_path="../../../chrom_sizes/mm10.txt"):
+def plot_consecutive_bead_distr(mu_pred, output_path, plot_show=False, resolution=2_000_000, diploid=True, chrom_sizes_path="../../../chrom_sizes/mm10.txt"):
     """
     Creates two plots tracking the consecutive bead distribution across mu_pred.
     """
@@ -354,7 +360,7 @@ def compute_triplet_angles(arr, degrees=True):
     angle_history = [compute_triplet_angles(arr) for arr in data_list]
 
 
-def plot_consecutive_angle_distr(mu_pred, output_path, plot_show=True, resolution=2_000_000, diploid=True, chrom_sizes_path="../../../chrom_sizes/mm10.txt"):
+def plot_consecutive_angle_distr(mu_pred, output_path, plot_show=False, resolution=2_000_000, diploid=True, chrom_sizes_path="../../../chrom_sizes/mm10.txt"):
     """
     Creates two plots tracking the consecutive bead distribution across mu_pred.
     """
@@ -444,9 +450,10 @@ def plot_consecutive_angle_distr(mu_pred, output_path, plot_show=True, resolutio
     if plot_show: plt.show()
 
 
-def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=True):
+def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=False):
     """
     Creates a heatmap of RMSD values between the inferred trajectory and original structures from ChromMovie simulation.
+    Additionally, a heatmap of RMSD between linear trajectory and original, as well as the difference between the two is created.
     """
     list_pred = [mu_pred[i,:-2].reshape(-1, 3) for i in range(mu_pred.shape[0])]
     list_orig = [orig_traj[i,:-2].reshape(-1, 3) for i in range(orig_traj.shape[0])]
@@ -519,16 +526,87 @@ def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=True):
     if plot_show: plt.show()
 
 
+def plot_2D_map(mu_pred, orig_traj, output_path, plot_show=False):
+    """
+    Uses last two coordinates of the prediction to plot the 2D trajectory and compares it to the linear interpolation.
+    """
+    list_pred = [mu_pred[i,-2:] for i in range(mu_pred.shape[0])]
+    list_orig = [orig_traj[i,-2:] for i in range(orig_traj.shape[0])]
+    list_linear = [list_orig[0]*(1-t)+list_orig[-1]*t for t in np.linspace(0, 1, len(list_pred))]
+
+    pred = np.vstack(list_pred)
+    linear = np.vstack(list_linear)
+    orig = np.vstack(list_orig)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Model prediction trajectory
+    pred = np.array(list_pred)
+    ax.plot(
+        pred[:, 0],
+        pred[:, 1],
+        c="blue",
+        marker="o",
+        label="Model prediction"
+    )
+
+    # Linear interpolation trajectory
+    linear = np.array(list_linear)
+    ax.plot(
+        linear[:, 0],
+        linear[:, 1],
+        c="gray",
+        marker="o",
+        label="Linear interpolation"
+    )
+
+    # Original/checkpoint coordinates
+    orig = np.array(list_orig)
+    ax.scatter(
+        orig[:, 0],
+        orig[:, 1],
+        s=80,
+        c="black",
+        zorder=3,
+        label="Original checkpoints"
+    )
+
+    # Label first and last checkpoints
+    ax.annotate(
+        "x0",
+        xy=orig[0],
+        xytext=(5, 5),
+        textcoords="offset points",
+        fontsize=12
+    )
+
+    ax.annotate(
+        "x1",
+        xy=orig[-1],
+        xytext=(5, 5),
+        textcoords="offset points",
+        fontsize=12
+    )
+
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_aspect("equal")
+    ax.set_box_aspect(1)
+    ax.legend()
+    plt.savefig(os.path.join(output_path, "model_2D_map.png"), dpi=300)
+    if plot_show: plt.show()
+
+
 # Execute Script
 if __name__ == "__main__":
 
     test_name = "test02"
     phase_trans = "G2M_to_G1"
+    trajectory_id = 2
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     model_path = f"../../../models/interpolant/{test_name}_interp.pt"
-    output_path = f"../../../results/interpolant/{test_name}/"
+    output_path = f"../../../results/interpolant/{test_name}/traj{str(trajectory_id).zfill(3)}"
 
-    # run_diagnostics(model_path, data_path, output_path, plot_show=True)
+    run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=trajectory_id, plot_show=False)
 
-    run_diagnostics_plots(model_path, data_path, output_path)
         
