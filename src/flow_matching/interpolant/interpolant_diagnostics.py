@@ -184,13 +184,13 @@ def run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=0):
     print("Ploting diagnostics plot...")
     # plot_diagnostics_gif(mu_pred, output_path)
 
-    print("Plotting consecutive bead distance distribution...")
+    print("Plotting consecutive bead distance distribution plots...")
     # plot_consecutive_bead_distr(mu_pred, output_path, plot_show=False)
 
-    print("Plotting consecutive bead angle distribution...")
+    print("Plotting consecutive bead angle distribution plots...")
     # plot_consecutive_angle_distr(mu_pred, output_path, plot_show=False)
 
-    print("Plotting RMSD plot...")
+    print("Plotting RMSD plots...")
     plot_rmsd(mu_pred, traj, output_path, plot_show=False)
 
     print("Diagnostic plots completed.")
@@ -450,10 +450,12 @@ def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=True):
     """
     list_pred = [mu_pred[i,:-2].reshape(-1, 3) for i in range(mu_pred.shape[0])]
     list_orig = [orig_traj[i,:-2].reshape(-1, 3) for i in range(orig_traj.shape[0])]
+    list_linear = [list_orig[0]*(1-t)+list_orig[-1]*t for t in np.linspace(0, 1, len(list_pred))]
 
     # Convert lists to 3D arrays: (M, K, 3) and (N, K, 3)
     A = np.array(list_pred)
     B = np.array(list_orig)
+    C = np.array(list_linear)
 
     # Vectorized pairwise distance calculation via broadcasting
     # Shape shift: (M, 1, K, 3) - (1, N, K, 3) -> (M, N, K, 3)
@@ -461,7 +463,11 @@ def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=True):
     squared_distances = np.sum(diff**2, axis=-1)  # Shape: (M, N, K)
     rmsd_matrix = np.sqrt(np.mean(squared_distances, axis=-1))  # Shape: (M, N)
 
-    # 3. Plot Heatmap
+    diff2 = C[:, None, :, :] - B[None, :, :, :]
+    squared_distances2 = np.sum(diff2**2, axis=-1)  # Shape: (M, N, K)
+    rmsd_matrix2 = np.sqrt(np.mean(squared_distances2, axis=-1))  # Shape: (M, N)
+
+    # Plot Heatmap with predicted
     plt.figure(figsize=(9, 7))
     sns.heatmap(
         rmsd_matrix,
@@ -471,12 +477,47 @@ def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=True):
         cbar_kws={"label": "RMSD"},
     )
 
-    plt.xlabel("List Original Trajectory Structure Index")
-    plt.ylabel("List Model Trajectory Index")
-    plt.title("Pairwise (All-vs-All) RMSD Heatmap")
+    plt.xlabel("Original Trajectory Structure Index")
+    plt.ylabel("Model Trajectory Index")
+    plt.title("Pairwise (All-vs-All) RMSD Heatmap for predicted trajectory")
     plt.tight_layout()
-    plt.savefig(os.path.join(output_path, "model_RMSD.png"), dpi=300)
+    plt.savefig(os.path.join(output_path, "model_RMSD_with_predicted.png"), dpi=300)
     if plot_show: plt.show()
+
+    # Plot Heatmap with linear
+    plt.figure(figsize=(9, 7))
+    sns.heatmap(
+        rmsd_matrix2,
+        cmap="RdYlGn_r",
+        xticklabels=1,
+        yticklabels=1,
+        cbar_kws={"label": "RMSD"},
+    )
+
+    plt.xlabel("Original Trajectory Structure Index")
+    plt.ylabel("Model Trajectory Index")
+    plt.title("Pairwise (All-vs-All) RMSD Heatmap for linear interpolation")
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "model_RMSD_with_linear.png"), dpi=300)
+    if plot_show: plt.show()
+
+    # Plot Heatmap of differences between RMSDs from linear and predicted
+    plt.figure(figsize=(9, 7))
+    sns.heatmap(
+        rmsd_matrix - rmsd_matrix2,
+        cmap="RdYlGn_r",
+        xticklabels=1,
+        yticklabels=1,
+        cbar_kws={"label": "RMSD difference"},
+    )
+
+    plt.xlabel("Original Trajectory Structure Index")
+    plt.ylabel("Model Trajectory Index")
+    plt.title("Pairwise (All-vs-All) difference between linear and predicted RMSD Heatmap")
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "model_RMSD_difference.png"), dpi=300)
+    if plot_show: plt.show()
+
 
 # Execute Script
 if __name__ == "__main__":
