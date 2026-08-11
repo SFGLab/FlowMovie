@@ -6,8 +6,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
-from interpolant_DataLoader import TrajectoryDataset
-from interpolant import PhiTransformer
+from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
+from src.flow_matching.interpolant.interpolant import PhiTransformer
 
 from src.md.visualization_utils import visualize_whole_genome, create_gif, get_chrom_sizes
 
