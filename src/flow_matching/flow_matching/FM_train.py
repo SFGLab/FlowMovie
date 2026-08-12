@@ -1,10 +1,13 @@
 import tqdm
 import torch
 import numpy as np
+from torch.utils.data import Dataset, DataLoader
 
 from src.flow_matching.interpolant.interpolant import PhiTransformer
 from src.flow_matching.interpolant.interpolant_diagnostics import predict_mu
 from src.flow_matching.flow_matching.OT import SinkhornDistance
+from src.flow_matching.flow_matching.FM_model import MLP
+from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
 
 
 def compute_flow_matching_target(phi_model, x0, x1, t):
@@ -76,9 +79,31 @@ def compute_flow_matching_target_fast(phi_model, x0, x1, t):
     return xt.detach(), target_ut.detach()
 
 
-def train_FM(model, phi_model_path, optim, x0_npy, x1_npy, training_steps=500, batch_size=10):
-    data_x0 = torch.from_numpy(x0_npy[:-1, :]).float()
-    data_x1 = torch.from_numpy(x1_npy[:-1, :]).float()
+def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_steps=500, batch_size=10):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset = TrajectoryDataset(pt_file_path)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    for batch_trajectories in dataloader:
+        # batch_trajectories shape: (Batch_Size, N, D)
+        batch_trajectories = batch_trajectories.to(device)
+        B, N, D = batch_trajectories.shape
+        x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
+        x1 = batch_trajectories[:, -1, :]  # Last frame (B, D)
+
+
+    # x0_npy = np.load("../../../data/trajectories_npy/test01/G1_to_S/x0.npy")
+    # x1_npy = np.load("../../../data/trajectories_npy/test01/G1_to_S/x1.npy")
+    # coords_x0 = np.random.randn(2*x0_npy.shape[0]).reshape((-1,2))
+    # coords_x1 = np.random.randn(2*x1_npy.shape[0]).reshape((-1,2))
+
+    # x0_npy = np.hstack((x0_npy, coords_x0))
+    # x1_npy = np.hstack((x1_npy, coords_x0))
+
+        
+    # data_x0old = torch.from_numpy(x0_npy[:-1, :]).float()
+    # data_x1old = torch.from_numpy(x1_npy[:-1, :]).float()
+    data_x0 = x0
+    data_x1 = x1
     
     indices = torch.randperm(batch_size)
     
@@ -91,7 +116,6 @@ def train_FM(model, phi_model_path, optim, x0_npy, x1_npy, training_steps=500, b
     x0_test, x1_test = data_x0[test_idx], data_x1[test_idx]
 
     # prepare interpolant Phi
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(phi_model_path, map_location=device)
     phi_model = PhiTransformer(input_dim=checkpoint["input_dim"]).to(device)
     phi_model.load_state_dict(checkpoint["model_state_dict"])
@@ -106,17 +130,17 @@ def train_FM(model, phi_model_path, optim, x0_npy, x1_npy, training_steps=500, b
         ids = torch.randint(x0_train.size(0), (batch_size,))
         x0 = x0_train[ids]
         x1 = x1_train[ids]
-        t = torch.rand((x1.size(0), 1))
+        t = torch.rand((x1.size(0), 1), device=device)
 
         # OT here (modifies x0 and x1 so as to create OT):
         # TODO 
-
-        # target velocity and xt in the case of linear interpolation:
-        # target_ut = x1 - x0
-        # xt = (1 - t[:, None]) * x0 + t[:, None] * x1
-
-        # target velocity and xt in the case of Phi interpolant correction:
-        xt, target_ut = compute_flow_matching_target(phi_model, x0, x1, t)
+ 
+        # target velocity and xt with or without Phi interpolant correction:
+        if mode == "linear":
+            target_ut = x1 - x0
+            xt = (1 - t[:, None]) * x0 + t[:, None] * x1
+        elif mode == "phi":
+            xt, target_ut = compute_flow_matching_target(phi_model, x0, x1, t)
 
         pred = model(xt, t)
         loss_train = ((target_ut - pred)**2).mean()
@@ -124,11 +148,13 @@ def train_FM(model, phi_model_path, optim, x0_npy, x1_npy, training_steps=500, b
         # ======== calculate test loss ======== 
         # OT TODO
 
-        t = torch.rand(x1_test.size(0))
+        t = torch.rand((x1_test.size(0), 1), device=device)
 
-        # target_ut = x1_test - x0_test
-        # xt = (1 - t[:, None]) * x0_test + t[:, None] * x1_test
-        xt, target_ut = compute_flow_matching_target(phi_model, x0_test, x1_test, t)
+        if mode == "linear":
+            target_ut = x1_test - x0_test
+            xt = (1 - t[:, None]) * x0_test + t[:, None] * x1_test
+        elif mode == "phi":
+            xt, target_ut = compute_flow_matching_target(phi_model, x0_test, x1_test, t)
         
         pred = model(xt, t)
         loss_test = ((target_ut - pred)**2).mean()
@@ -144,4 +170,16 @@ def train_FM(model, phi_model_path, optim, x0_npy, x1_npy, training_steps=500, b
     return losses_train, losses_test
 
 
+if __name__ == "__main__":
+    # Execute training
+
+    model = MLP(layers=5, channels_data=7976, channels=512)
+    optim = torch.optim.AdamW(model.parameters(), lr=1e-4)
+
+    test_name = "test02"
+    phase_trans = "G2M_to_G1"
+    phi_model_path = f"../../../models/interpolant/{test_name}_interp.pt"
+    data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     
+    losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path,
+                                mode="phi", training_steps=100, batch_size=5)
