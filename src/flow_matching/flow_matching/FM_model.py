@@ -17,6 +17,9 @@ class Block(nn.Module):
 class MLP(nn.Module):
     def __init__(self, channels_data=2, layers=5, channels=512, channels_t=512):
         super().__init__()
+        self.channels_data = channels_data
+        self.layers = layers
+        self.channels = channels
         self.channels_t = channels_t
         self.in_projection = nn.Linear(channels_data, channels)
         self.t_projection = nn.Linear(channels_t, channels)

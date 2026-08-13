@@ -80,7 +80,12 @@ def compute_flow_matching_target_fast(phi_model, x0, x1, t):
 
 
 def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_steps=500, batch_size=10):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        print("Running on CUDA...")
+        device = torch.device("cuda")
+    else:
+        print("Running on CPU...")
+        device = torch.device("cpu")
     dataset = TrajectoryDataset(pt_file_path)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     for batch_trajectories in dataloader:
@@ -90,18 +95,6 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
         x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
         x1 = batch_trajectories[:, -1, :]  # Last frame (B, D)
 
-
-    # x0_npy = np.load("../../../data/trajectories_npy/test01/G1_to_S/x0.npy")
-    # x1_npy = np.load("../../../data/trajectories_npy/test01/G1_to_S/x1.npy")
-    # coords_x0 = np.random.randn(2*x0_npy.shape[0]).reshape((-1,2))
-    # coords_x1 = np.random.randn(2*x1_npy.shape[0]).reshape((-1,2))
-
-    # x0_npy = np.hstack((x0_npy, coords_x0))
-    # x1_npy = np.hstack((x1_npy, coords_x0))
-
-        
-    # data_x0old = torch.from_numpy(x0_npy[:-1, :]).float()
-    # data_x1old = torch.from_numpy(x1_npy[:-1, :]).float()
     data_x0 = x0
     data_x1 = x1
     
@@ -182,4 +175,18 @@ if __name__ == "__main__":
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     
     losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path,
-                                mode="phi", training_steps=100, batch_size=5)
+                                mode="phi", training_steps=4, batch_size=5)
+
+    # Save trained model:
+    model_path = f"../../../models/FM/{test_name}_FM_model.pt"
+    checkpoint = {
+        "model_state_dict": model.state_dict(),
+        "channels_data": model.channels_data,
+        "layers": model.layers,
+        "channels": model.channels,
+        "channels_t": model.channels_t
+    }
+    torch.save(checkpoint, model_path)
+    print(f"Model saved successfully to {model_path}")
+
+    

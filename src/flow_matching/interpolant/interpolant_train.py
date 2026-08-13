@@ -6,7 +6,13 @@ from interpolant_DataLoader import TrajectoryDataset
 from interpolant import PhiTransformer
 
 
-def train_interpolant(pt_file_path, num_epochs=20, lr=1e-3, device="cuda" if torch.cuda.is_available() else "cpu"):
+def train_interpolant(pt_file_path, num_epochs=20, lr=1e-3):
+    if torch.cuda.is_available():
+        print("Running on CUDA...")
+        device = torch.device("cuda")
+    else:
+        print("Running on CPU...")
+        device = torch.device("cpu")
     dataset = TrajectoryDataset(pt_file_path)
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
     
@@ -68,7 +74,7 @@ if __name__ == "__main__":
     trained_model = train_interpolant(data_path)
 
     # Save trained model:
-    model_path = f"../../../models/interpolant/{test_name}_interp.pt"
+    model_path = f"../../../models/interpolant/{test_name}_interp_model.pt"
     checkpoint = {
         "model_state_dict": trained_model.state_dict(),
         "input_dim": trained_model.input_dim,  # e.g., K * 3
