@@ -29,7 +29,7 @@ class MLP(nn.Module):
         self.out_projection = nn.Linear(channels, channels_data)
 
     def gen_t_embedding(self, t, max_positions=10000):
-        # FIX: Remove the extra dimension, converting [B, 1] -> [B]
+        # Converting [B, 1] -> [B] if necessary
         if t.ndim == 2:
             t = t.squeeze(1) 
             
@@ -37,14 +37,10 @@ class MLP(nn.Module):
         half_dim = self.channels_t // 2
         emb = math.log(max_positions) / (half_dim - 1)
         emb = torch.arange(half_dim, device=t.device).float().mul(-emb).exp()
-        
-        # Now this will correctly be [B] -> [B, 1] * [1, half_dim] -> [B, half_dim]
         emb = t[:, None] * emb[None, :]
+        emb = torch.cat([emb.sin(), emb.cos()], dim=1) # [B, channels_t]
         
-        # Concatenating on dim=1 will correctly make it [B, channels_t] -> e.g., [5, 512]
-        emb = torch.cat([emb.sin(), emb.cos()], dim=1)
-        
-        if self.channels_t % 2 == 1:  # zero pad
+        if self.channels_t % 2 == 1:
             emb = nn.functional.pad(emb, (0, 1), mode='constant')
         return emb
 
