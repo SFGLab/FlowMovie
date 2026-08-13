@@ -1,3 +1,4 @@
+import os
 import tqdm
 import torch
 import numpy as np
@@ -163,22 +164,29 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
     return losses_train, losses_test
 
 
-if __name__ == "__main__":
+def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10):
     # Execute training
-
     model = MLP(layers=5, channels_data=7976, channels=512)
     optim = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
-    test_name = "test02"
-    phase_trans = "G2M_to_G1"
     phi_model_path = f"../../../models/interpolant/{test_name}_interp.pt"
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     
     losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path,
-                                mode="phi", training_steps=4, batch_size=5)
+                                mode=mode, training_steps=training_steps, 
+                                batch_size=batch_size)
+
+    # Save losses:
+    losses_path = f"../../../results/FM/{test_name}/losses"
+    if not os.path.exists(losses_path):
+        os.makedirs(losses_path)
+    np.savetxt(os.path.join(losses_path, f"{test_name}_loss_train.txt"), losses_train)
+    np.savetxt(os.path.join(losses_path, f"{test_name}_loss_test.txt"), losses_test)
 
     # Save trained model:
     model_path = f"../../../models/FM/{test_name}_FM_model.pt"
+    if not os.path.exists(model_path):
+        os.makedirs(model_path)
     checkpoint = {
         "model_state_dict": model.state_dict(),
         "channels_data": model.channels_data,
@@ -188,5 +196,12 @@ if __name__ == "__main__":
     }
     torch.save(checkpoint, model_path)
     print(f"Model saved successfully to {model_path}")
+
+
+if __name__ == "__main__":
+    test_name = "test02"
+    phase_trans = "G2M_to_G1"
+
+    main(test_name, phase_trans, mode="phi", training_steps=3, batch_size=5)
 
     
