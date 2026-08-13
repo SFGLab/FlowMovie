@@ -1,8 +1,14 @@
+import os
 import tqdm
 import math
 import torch
 import numpy as np
 from torch import nn
+from torch.utils.data import DataLoader
+
+from src.flow_matching.flow_matching.FM_model import MLP
+from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
+from src.md.visualization_utils import visualize_whole_genome, create_gif
 
 
 @torch.no_grad()
@@ -42,3 +48,54 @@ def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="
             structures.append(x_curr.cpu().numpy())
             
     return structures
+
+
+if __name__ == "__main__":
+    test_name = "test02"
+    phase_trans = "G2M_to_G1"
+
+    # Load preptrained model:
+    device = torch.device("cpu")
+    model_path = f"../../../models/FM/{test_name}_FM_model.pt"
+    model = MLP(layers=5, channels_data=7976, channels=512)
+    ckpt = torch.load(model_path, map_location=device)
+    model.load_state_dict(ckpt["model_state_dict"])
+    model.eval()
+
+    # Load the data:
+    pt_file_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
+    dataset = TrajectoryDataset(pt_file_path)
+    dataloader = DataLoader(dataset, batch_size=20, shuffle=True)
+    for batch_trajectories in dataloader:
+        # batch_trajectories shape: (Batch_Size, N, D)
+        batch_trajectories = batch_trajectories.to(device)
+        B, N, D = batch_trajectories.shape
+        x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
+        x1 = batch_trajectories[:, -1, :]  # Last frame (B, D)
+    data_x0 = x0
+    data_x1 = x1
+
+    print(data_x0.shape, data_x1.shape)
+    # Iterating the trajectory:
+    structures = iterate_trajectory_pytorch(model, data_x0)
+    structures = [struct[0,:-2] for struct in structures]
+    structures = [struct.reshape((int(struct.shape[0]/3), 3)) for struct in structures]
+
+    # Visualization:
+    viz_path = f"../../../results/FM/{test_name}/viz"
+    if not os.path.exists(viz_path):
+        os.makedirs(viz_path)
+
+    x0_3d = structures[0]
+    axis_ranges = [x0_3d[:,0].min(), x0_3d[:,0].max(),
+               x0_3d[:,1].min(), x0_3d[:,1].max(),
+               x0_3d[:,2].min(), x0_3d[:,2].max()]
+    figs = [visualize_whole_genome(
+            points, 
+            diploid=True, 
+            chrom_sizes_path="../../../chrom_sizes/mm10.txt",
+            resolution=2_000_000, p=0, title=f"Frame {i}", 
+            fig_show=False, axis_range=axis_ranges) \
+        for i, points in enumerate(structures)]
+    create_gif(figs, os.path.join(viz_path, "traj_FM.gif"), duration=300)
+
