@@ -95,16 +95,17 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
         B, N, D = batch_trajectories.shape
         x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
         x1 = batch_trajectories[:, -1, :]  # Last frame (B, D)
+        break
 
     data_x0 = x0
     data_x1 = x1
     
-    indices = torch.randperm(batch_size)
+    indices = torch.randperm(B)
     
     # Split indices (80/20)
-    train_size = int(0.8 * batch_size)
+    train_size = int(0.8 * B)
     train_idx, test_idx = indices[:train_size], indices[train_size:]
-    
+
     # Slice tensors
     x0_train, x1_train = data_x0[train_idx], data_x1[train_idx]
     x0_test, x1_test = data_x0[test_idx], data_x1[test_idx]
@@ -121,7 +122,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
     losses_test = []
     for i in pbar:
         # ======== calculate train loss ======== 
-        ids = torch.randint(x0_train.size(0), (batch_size,))
+        ids = torch.randint(x0_train.size(0), (B,))
         x0 = x0_train[ids]
         x1 = x1_train[ids]
         t = torch.rand((x1.size(0), 1), device=device)
@@ -202,6 +203,6 @@ if __name__ == "__main__":
     test_name = "test02"
     phase_trans = "G2M_to_G1"
 
-    main(test_name, phase_trans, mode="phi", training_steps=3, batch_size=5)
+    main(test_name, phase_trans, mode="phi", training_steps=10, batch_size=15)
 
     
