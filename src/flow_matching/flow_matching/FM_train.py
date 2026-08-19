@@ -6,7 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 
 from src.flow_matching.interpolant.interpolant import PhiTransformer
 from src.flow_matching.interpolant.interpolant_diagnostics import predict_mu
-from src.flow_matching.flow_matching.OT import SinkhornDistance
+from src.flow_matching.flow_matching.OT import get_OT_x1
 from src.flow_matching.flow_matching.FM_model import MLP
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
 
@@ -127,8 +127,8 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
         x1 = x1_train[ids]
         t = torch.rand((x1.size(0), 1), device=device)
 
-        # OT here (modifies x0 and x1 so as to create OT):
-        # TODO 
+        # Optimal Transport plan (modifies x1 so as to create OT):
+        x1 = get_OT_x1(x0, x1)
  
         # target velocity and xt with or without Phi interpolant correction:
         if mode == "linear":
@@ -141,15 +141,16 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
         loss_train = ((target_ut - pred)**2).mean()
     
         # ======== calculate test loss ======== 
-        # OT TODO
+        # Optimal Transport plan
+        x1_test_OT = get_OT_x1(x0_test, x1_test)
 
         t = torch.rand((x1_test.size(0), 1), device=device)
 
         if mode == "linear":
-            target_ut = x1_test - x0_test
-            xt = (1 - t[:, None]) * x0_test + t[:, None] * x1_test
+            target_ut = x1_test - x1_test_OT
+            xt = (1 - t[:, None]) * x1_test_OT + t[:, None] * x1_test
         elif mode == "phi":
-            xt, target_ut = compute_flow_matching_target(phi_model, x0_test, x1_test, t)
+            xt, target_ut = compute_flow_matching_target(phi_model, x1_test_OT, x1_test, t)
         
         pred = model(xt, t)
         loss_test = ((target_ut - pred)**2).mean()
@@ -203,6 +204,6 @@ if __name__ == "__main__":
     test_name = "test02"
     phase_trans = "G2M_to_G1"
 
-    main(test_name, phase_trans, mode="phi", training_steps=10, batch_size=15)
+    main(test_name, phase_trans, mode="phi", training_steps=5, batch_size=5)
 
     
