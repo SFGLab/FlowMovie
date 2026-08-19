@@ -1,9 +1,5 @@
 import os
-import tqdm
-import math
 import torch
-import numpy as np
-from torch import nn
 from torch.utils.data import DataLoader
 
 from src.flow_matching.flow_matching.FM_model import MLP
@@ -50,11 +46,12 @@ def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="
     return structures
 
 
-if __name__ == "__main__":
-    test_name = "test02"
-    phase_trans = "G2M_to_G1"
-
-    # Load preptrained model:
+def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
+    """
+    Based on the FM model from test_naem and phase_trans, creates a vizualization gif.
+    resolution, p and duration are the gif parameters.
+    """
+    # Load pretrained model:
     device = torch.device("cpu")
     model_path = f"../../../models/FM/{test_name}_FM_model.pt"
     model = MLP(layers=5, channels_data=7976, channels=512)
@@ -72,10 +69,9 @@ if __name__ == "__main__":
         B, N, D = batch_trajectories.shape
         x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
         x1 = batch_trajectories[:, -1, :]  # Last frame (B, D)
+        break
     data_x0 = x0
-    data_x1 = x1
 
-    print(data_x0.shape, data_x1.shape)
     # Iterating the trajectory:
     structures = iterate_trajectory_pytorch(model, data_x0)
     structures = [struct[0,:-2] for struct in structures]
@@ -88,14 +84,24 @@ if __name__ == "__main__":
 
     x0_3d = structures[0]
     axis_ranges = [x0_3d[:,0].min(), x0_3d[:,0].max(),
-               x0_3d[:,1].min(), x0_3d[:,1].max(),
-               x0_3d[:,2].min(), x0_3d[:,2].max()]
+                x0_3d[:,1].min(), x0_3d[:,1].max(),
+                x0_3d[:,2].min(), x0_3d[:,2].max()]
     figs = [visualize_whole_genome(
             points, 
             diploid=True, 
             chrom_sizes_path="../../../chrom_sizes/mm10.txt",
-            resolution=2_000_000, p=0, title=f"Frame {i}", 
+            resolution=resolution, p=p, title=f"Frame {i}", 
             fig_show=False, axis_range=axis_ranges) \
         for i, points in enumerate(structures)]
-    create_gif(figs, os.path.join(viz_path, "traj_FM.gif"), duration=300)
+
+    path_gif = os.path.join(viz_path, "traj_FM.gif")
+    create_gif(figs, path_gif, duration=duration)
+    print(f"Successfully created gif at {os.path.join(viz_path, "traj_FM.gif")}.")
+
+
+if __name__ == "__main__":
+    test_name = "test02"
+    phase_trans = "G2M_to_G1"
+
+    main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300)
 
