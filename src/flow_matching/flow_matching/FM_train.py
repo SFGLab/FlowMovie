@@ -1,15 +1,14 @@
 import os
-import tqdm
+from tqdm import tqdm
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
 from src.flow_matching.interpolant.interpolant import PhiTransformer
-# from src.flow_matching.flow_matching.FM_visualization_utils import visualize_batch_OT_plan
+from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
 from src.flow_matching.flow_matching.OT import get_OT_x1
 from src.flow_matching.flow_matching.FM_model import MLP
-from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
 
 
 def compute_flow_matching_xt(phi_model, x0, x1, t):
@@ -59,6 +58,10 @@ def compute_flow_matching_target(phi_model, x0, x1, t):
 def compute_flow_matching_target_fast(phi_model, x0, x1, t):
     """
     Vectorized computation of d(Phi)/dt for high-dimensional feature spaces.
+
+    x0: (Batch, K*3)
+    x1: (Batch, K*3)
+    t:  (Batch, 1) in [0, 1]
     """
     t = t.clone().detach().requires_grad_(True) # (Batch, 1)
     
@@ -105,14 +108,10 @@ def visualize_batch_OT_plan(x0, x1, x1_OT, batch_id, output_path, phi_model, num
     """
     steps_preOT = get_trajectory(phi_model, x0, x1, num_steps=num_steps)
     steps_postOT = get_trajectory(phi_model, x0, x1_OT, num_steps=num_steps)
-    # print("x1", x1[0, -2:])
-    # print("x1_OT", x1_OT[0, -2:])
-    # print("pre OT", steps_preOT[-1][0,-2:])
-    # print("post OT", steps_postOT[-1][0,-2:])
-    # print(len(steps_postOT), len(steps_preOT))
+
     fig, ax = plt.subplots(1, 2, figsize=(12, 6))
 
-    for i in tqdm.tqdm(range(x0.shape[0])):
+    for i in range(x0.shape[0]):
         traj_x = [step[i,-2].detach().numpy() for step in steps_preOT]
         traj_y = [step[i,-1].detach().numpy() for step in steps_preOT]
         ax[0].plot(traj_x, traj_y, color="red", alpha=0.2, lw=5)
@@ -141,12 +140,16 @@ def visualize_batch_OT_plan(x0, x1, x1_OT, batch_id, output_path, phi_model, num
     print(f"Saved: {filename}")
 
 
-def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_steps=500, batch_size=10):
+def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_steps=500, batch_size=10, OT_reg=0.1, viz_OT=False):
+    """
+    Main function for the execution of the training of the FM model.
+    Returns losses for the training and test set.
+    """
     if torch.cuda.is_available():
         print("Running on CUDA...")
         device = torch.device("cuda")
     else:
-        print("Running on CPU...")
+        print("Running on CPU (CUDA not available)...")
         device = torch.device("cpu")
     dataset = TrajectoryDataset(pt_file_path)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -178,7 +181,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
     phi_model.eval()
 
     # main training loop
-    pbar = tqdm.tqdm(range(training_steps))
+    pbar = tqdm(range(training_steps))
     losses_train = []
     losses_test = []
     for i in pbar:
@@ -189,25 +192,25 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
         t = torch.rand((x1.size(0), 1), device=device)
 
         # Optimal Transport plan (modifies x1 so as to create OT):
-        x1_OT = get_OT_x1(x0, x1, reg=0.4)
-        print(x0.shape, x1.shape, x1_OT.shape)
-        print("Visualizing the OT plan...")
-        visualize_batch_OT_plan(x0, x1, x1_OT, i, \
-                                "../../../results/FM/test02/viz", phi_model, num_steps=4)
+        x1_OT = get_OT_x1(x0, x1, reg=OT_reg)
+        if viz_OT:
+            print("Visualizing the OT plan...")
+            visualize_batch_OT_plan(x0, x1, x1_OT, i, \
+                                    "../../../results/FM/test02/viz", phi_model, num_steps=4)
         
         # target velocity and xt with or without Phi interpolant correction:
         if mode == "linear":
             target_ut = x1_OT - x0
             xt = (1 - t[:, None]) * x0 + t[:, None] * x1_OT
         elif mode == "phi":
-            xt, target_ut = compute_flow_matching_target(phi_model, x0, x1_OT, t)
+            xt, target_ut = compute_flow_matching_target_fast(phi_model, x0, x1_OT, t)
 
         pred = model(xt, t)
         loss_train = ((target_ut - pred)**2).mean()
     
         # ======== calculate test loss ======== 
         # Optimal Transport plan
-        x1_test_OT = get_OT_x1(x0_test, x1_test)
+        x1_test_OT = get_OT_x1(x0_test, x1_test, reg=OT_reg)
 
         t = torch.rand((x1_test.size(0), 1), device=device)
 
@@ -215,7 +218,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
             target_ut = x1_test - x1_test_OT
             xt = (1 - t[:, None]) * x1_test_OT + t[:, None] * x1_test
         elif mode == "phi":
-            xt, target_ut = compute_flow_matching_target(phi_model, x1_test_OT, x1_test, t)
+            xt, target_ut = compute_flow_matching_target_fast(phi_model, x1_test_OT, x1_test, t)
         
         pred = model(xt, t)
         loss_test = ((target_ut - pred)**2).mean()
@@ -231,7 +234,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
     return losses_train, losses_test
 
 
-def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10):
+def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, OT_reg=0.1, viz_OT=False):
     # Execute training
     model = MLP(layers=5, channels_data=7976, channels=512)
     optim = torch.optim.AdamW(model.parameters(), lr=1e-4)
@@ -241,7 +244,7 @@ def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10):
     
     losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path,
                                 mode=mode, training_steps=training_steps, 
-                                batch_size=batch_size)
+                                batch_size=batch_size, OT_reg=OT_reg, viz_OT=viz_OT)
 
     # Save losses:
     losses_path = f"../../../results/FM/{test_name}/losses"
@@ -269,6 +272,7 @@ if __name__ == "__main__":
     test_name = "test02"
     phase_trans = "G2M_to_G1"
 
-    main(test_name, phase_trans, mode="phi", training_steps=5, batch_size=10)
+    main(test_name, phase_trans, mode="phi", 
+         training_steps=15, batch_size=10, OT_reg=0.01, viz_OT=True)
 
     

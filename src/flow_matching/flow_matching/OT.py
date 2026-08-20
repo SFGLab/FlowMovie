@@ -10,8 +10,9 @@ def get_cost_matrix(x0, x1):
     Input: x0 and x1 of shape (B, D).
     Returns: cost_matrix of shape (B, B).
     """
-    cost_matrix = torch.cdist(x0[:,:-2], x1[:,:-2], p=2) ** 2
+    cost_matrix = torch.cdist(x0[:,-2:], x1[:,-2:], p=2) ** 2
     return cost_matrix
+
 
 def get_cost_matrix_msd(x0, x1):
     """
