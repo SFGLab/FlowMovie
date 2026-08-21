@@ -48,7 +48,7 @@ def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="
 
 def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
     """
-    Based on the FM model from test_naem and phase_trans, creates a vizualization gif.
+    Based on the FM model from test_name and phase_trans, creates a vizualization gif.
     resolution, p and duration are the gif parameters.
     """
     # Load pretrained model:
@@ -62,15 +62,12 @@ def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
     # Load the data:
     pt_file_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     dataset = TrajectoryDataset(pt_file_path)
-    dataloader = DataLoader(dataset, batch_size=20, shuffle=True)
-    for batch_trajectories in dataloader:
-        # batch_trajectories shape: (Batch_Size, N, D)
-        batch_trajectories = batch_trajectories.to(device)
-        B, N, D = batch_trajectories.shape
-        x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
-        x1 = batch_trajectories[:, -1, :]  # Last frame (B, D)
-        break
-    data_x0 = x0
+    full_batch_size = len(dataset)
+    dataloader = DataLoader(dataset, batch_size=full_batch_size, shuffle=True)
+    batch_trajectories = next(iter(dataloader)).to(device)
+    # batch_trajectories shape: (Total_Dataset_Size, N, D)
+    B, N, D = batch_trajectories.shape
+    data_x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
 
     # Iterating the trajectory:
     structures = iterate_trajectory_pytorch(model, data_x0)
