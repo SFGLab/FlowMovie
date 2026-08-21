@@ -140,7 +140,7 @@ def visualize_batch_OT_plan(x0, x1, x1_OT, batch_id, output_path, phi_model, num
     print(f"Saved: {filename}")
 
 
-def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_steps=500, batch_size=10, OT_reg=0.1, viz_OT=False):
+def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", training_steps=500, batch_size=10, OT_reg=0.1, viz_OT=False):
     """
     Main function for the execution of the training of the FM model.
     Returns losses for the training and test set.
@@ -196,7 +196,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, mode="phi", training_st
         if viz_OT:
             print("Visualizing the OT plan...")
             visualize_batch_OT_plan(x0, x1, x1_OT, i, \
-                                    "../../../results/FM/test02/viz", phi_model, num_steps=4)
+                                    f"../../../results/FM/{test_name}/viz", phi_model, num_steps=4)
         
         # target velocity and xt with or without Phi interpolant correction:
         if mode == "linear":
@@ -242,7 +242,7 @@ def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, 
     phi_model_path = f"../../../models/interpolant/{test_name}_interp.pt"
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     
-    losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path,
+    losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path, test_name=test_name,
                                 mode=mode, training_steps=training_steps, 
                                 batch_size=batch_size, OT_reg=OT_reg, viz_OT=viz_OT)
 
@@ -273,6 +273,6 @@ if __name__ == "__main__":
     phase_trans = "G2M_to_G1"
 
     main(test_name, phase_trans, mode="phi", 
-         training_steps=15, batch_size=10, OT_reg=0.01, viz_OT=True)
+         training_steps=100, batch_size=50, OT_reg=0.01, viz_OT=False)
 
     
