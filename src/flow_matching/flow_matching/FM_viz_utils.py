@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 import io
 from PIL import Image
+from scipy.stats import gaussian_kde
 from torch.utils.data import DataLoader
 
 from src.flow_matching.flow_matching.FM_model import MLP
@@ -46,7 +47,7 @@ def plot_model_losses(train_file, test_file, out_path, fig_show=True):
         print(f"Succcessfully saved losses png at {out_path}")
 
 
-def create_gif_from_figs(figs, filename, duration=200):
+def create_gif_from_figs(figs, filename, duration=300):
     """
     Converts a list of matplotlib Figure objects into a GIF.
     
@@ -76,9 +77,10 @@ def create_gif_from_figs(figs, filename, duration=200):
         print(f"Successfully saved {len(figs)} frames to {filename}")
 
 
-def plot_point_evolution(points_list):
+def plot_point_evolution(points_list, xlim, ylim):
     """
-    Creates and returns a fig object from a list of strutures.
+    Creates and returns a fig object from a list of structures,
+    including a background KDE density map for the final positions.
     """
     data = np.array(points_list)
     X = data[:, :, 0]
@@ -86,23 +88,45 @@ def plot_point_evolution(points_list):
     
     fig, ax = plt.subplots(figsize=(10, 8))
     
-    ax.plot(X, Y, color='gray', alpha=0.3, linewidth=1, zorder=1)
+    x_final = X[-1, :]
+    y_final = Y[-1, :]
+    
+    # Create a 100x100 grid over the specified xlim and ylim bounds
+    xx, yy = np.mgrid[xlim[0]:xlim[1]:100j, ylim[0]:ylim[1]:100j]
+    positions = np.vstack([xx.ravel(), yy.ravel()])
+    final_points = np.vstack([x_final, y_final])
+    
+    # Fit the Gaussian KDE and evaluate it on the grid
+    kernel = gaussian_kde(final_points)
+    density = np.reshape(kernel(positions).T, xx.shape)
+    
+    _ = ax.pcolormesh(
+        xx, yy, density, 
+        cmap='viridis', 
+        alpha=0.6, 
+        shading='gouraud',
+        zorder=0
+    )
+
+    ax.plot(X, Y, color='black', alpha=0.2, linewidth=2, zorder=1)
     
     ax.scatter(X[0, :], Y[0, :], 
-               color='blue', marker='o', s=30, label='Start', zorder=3)
+               color='blue', edgecolor='black', marker='o', s=30, label='Start', zorder=3)
     
     ax.scatter(X[-1, :], Y[-1, :], 
-               color='yellow', marker='o', s=50, label='End', zorder=3)
+               color='yellow', edgecolor='black', marker='o', s=50, label='End', zorder=3)
     
-    ax.set_title('Evolution of 100 Points Over Time', fontsize=14, fontweight='bold')
+    ax.set_title(f'Evolution of {data.shape[1]} FM Trajectories Over Time', fontsize=14, fontweight='bold')
     ax.set_xlabel('X Coordinate', fontsize=12)
     ax.set_ylabel('Y Coordinate', fontsize=12)
-    ax.grid(True, linestyle=':', alpha=0.6)
-    
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+        
+    ax.grid(True, linestyle=':', alpha=0.6, zorder=0.5)
     ax.legend(fontsize=12, loc='best')
     fig.tight_layout()
+    
     return fig
-
 
 def create_FM_gif(model_path, data_path, out_path):
     """
@@ -123,12 +147,19 @@ def create_FM_gif(model_path, data_path, out_path):
     data_x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
 
     structures = iterate_trajectory_pytorch(FM_model, data_x0,
-                                            num_steps=50, save_every=2, method="rk4")
+                                            num_steps=100, save_every=5, 
+                                            method="rk4", end_time=7.0)
     structures = [struct[:, -2:] for struct in structures]
 
+    data = np.array(structures)
+    X = data[:, :, 0]
+    Y = data[:, :, 1]
+    xlim = (np.min(X), np.max(X))
+    ylim = (np.min(Y), np.max(Y))
+        
     figs = []
     for i in range(1, len(structures)):
-        figs.append(plot_point_evolution(structures[:i]))
+        figs.append(plot_point_evolution(structures[:i], xlim, ylim))
     create_gif_from_figs(figs, out_path)
 
 

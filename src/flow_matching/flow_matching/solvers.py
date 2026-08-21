@@ -8,7 +8,7 @@ from src.md.visualization_utils import visualize_whole_genome, create_gif
 
 
 @torch.no_grad()
-def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="rk4"):
+def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="rk4", end_time=1.0):
     """
     x0: torch.Tensor of shape (3m,) or (m, 3)
     """
@@ -16,7 +16,7 @@ def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="
     if not isinstance(x0, torch.Tensor):
         x0 = torch.tensor(x0, dtype=torch.float32, device=device)
         
-    t_span = torch.linspace(0.0, 1.0, num_steps, device=device)
+    t_span = torch.linspace(0.0, end_time, num_steps, device=device)
     dt = t_span[1] - t_span[0]
     
     x_curr = x0.clone()
