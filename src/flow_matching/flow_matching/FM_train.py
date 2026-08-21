@@ -151,15 +151,15 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
     else:
         print("Running on CPU (CUDA not available)...")
         device = torch.device("cpu")
+        
     dataset = TrajectoryDataset(pt_file_path)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    for batch_trajectories in dataloader:
-        # batch_trajectories shape: (Batch_Size, N, D)
-        batch_trajectories = batch_trajectories.to(device)
-        B, N, D = batch_trajectories.shape
-        x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
-        x1 = batch_trajectories[:, -1, :]  # Last frame (B, D)
-        break
+    full_batch_size = len(dataset)
+    dataloader = DataLoader(dataset, batch_size=full_batch_size, shuffle=True)
+    batch_trajectories = next(iter(dataloader)).to(device)
+    # batch_trajectories shape: (Total_Dataset_Size, N, D)
+    B, N, D = batch_trajectories.shape
+    x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
+    x1 = batch_trajectories[:, -1, :]  # Last frame (B, D)
 
     data_x0 = x0
     data_x1 = x1
