@@ -42,11 +42,11 @@ class PhiTransformer(nn.Module):
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         
-        # Final head to output shape (K*3)
+        # Final head to output shape (D)
         self.out_head = nn.Linear(d_model, input_dim)
 
     def forward(self, x0, x1, t):
-        # x0, x1: (Batch, K*3)
+        # x0, x1: (Batch, D)
         # t: (Batch, 1) or (Batch,)
         
         # Embed inputs to sequence tokens: Length = 3 (x0, x1, time_token)
@@ -63,7 +63,7 @@ class PhiTransformer(nn.Module):
         # Aggregate features across token sequence (or take the time token output)
         pooled = feat.mean(dim=1)  # (Batch, d_model)
         
-        # Output Phi correction term: (Batch, K*3)
+        # Output Phi correction term: (Batch, D)
         phi = self.out_head(pooled)
         return phi
 
