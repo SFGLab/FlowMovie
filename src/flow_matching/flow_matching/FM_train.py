@@ -94,6 +94,11 @@ def compute_flow_matching_target_fast(phi_model, x0, x1, t):
 
 
 def get_trajectory(phi_model, x0, x1, num_steps=10):
+    """
+    Computes num_steps structures based on phi_model between x0 and x1.
+    Uses evenly distributed times between 0 and 1.
+    Returns a list of structures of length num_steps from x0 to x1.
+    """
     time_steps = torch.linspace(0, 1, steps=num_steps)
     steps = []
     for t in time_steps:

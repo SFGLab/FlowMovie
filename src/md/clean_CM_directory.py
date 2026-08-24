@@ -7,8 +7,9 @@ import argparse
 
 def clean_directory(yaml_path):
     """
-    Deletes all the files in the output directory from the ChromMovie simulation except for the cif files of the structures from the last step.
-    THe output directory is determined from the YAML file in yaml_path.
+    Deletes all the files in the output directory from the ChromMovie simulation 
+    except for the cif files of the structures from the last step and the YAML configuration file.
+    The output directory is determined from the YAML file in yaml_path.
     All of the files in the determined output directory are expected to contain a specific ChromMovie simulation output.
     """
 

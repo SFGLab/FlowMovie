@@ -65,7 +65,7 @@ def create_gif_from_figs(figs, filename, duration=300):
         image = Image.open(buf).convert('RGBA')
         images.append(image)
         plt.close(fig)
-        
+       
     if images:
         images[0].save(
             filename,
@@ -86,7 +86,7 @@ def plot_point_evolution(points_list, xlim, ylim):
     X = data[:, :, 0]
     Y = data[:, :, 1]
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(5, 4))
     
     x_final = X[-1, :]
     y_final = Y[-1, :]
@@ -128,6 +128,7 @@ def plot_point_evolution(points_list, xlim, ylim):
     
     return fig
 
+
 def create_FM_gif(model_path, data_path, out_path):
     """
     Main function for creating a gif visualization file for the FM iterated trajectories.
@@ -147,7 +148,7 @@ def create_FM_gif(model_path, data_path, out_path):
     data_x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
 
     structures = iterate_trajectory_pytorch(FM_model, data_x0,
-                                            num_steps=100, save_every=5, 
+                                            num_steps=100, save_every=1, 
                                             method="rk4", end_time=7.0)
     structures = [struct[:, -2:] for struct in structures]
 
@@ -160,7 +161,7 @@ def create_FM_gif(model_path, data_path, out_path):
     figs = []
     for i in range(1, len(structures)):
         figs.append(plot_point_evolution(structures[:i], xlim, ylim))
-    create_gif_from_figs(figs, out_path)
+    create_gif_from_figs(figs, out_path, duration=50)
 
 
 if __name__ == "__main__":
