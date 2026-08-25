@@ -58,7 +58,7 @@ def predict_mu(model, x0, x1, t):
 # ---------------------------------------------------------
 # 2. Main Plotting Routine
 # ---------------------------------------------------------
-def run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=0, plot_show=False):
+def run_diagnostics_plots(model_path, data_path, loss_path, output_path, trajectory_id=0, plot_show=False):
     """
     Wrapper function that starts all of the ploting functions.
     """
@@ -88,6 +88,9 @@ def run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=0, p
     t_grid, mu_pred, phi_pred = evaluate_trajectory(model, x0, x1, num_time_steps=20, device=device)
 
     # Preparing diagnostics
+    print("Plotting losses plot...")
+    plot_model_losses(loss_path, loss_path, output_path, fig_show=plot_show)
+
     print("Ploting diagnostics plot...")
     plot_diagnostics(model_path, data_path, output_path, trajectory_id=trajectory_id, plot_show=plot_show)
 
@@ -597,6 +600,40 @@ def plot_2D_map(mu_pred, orig_traj, output_path, plot_show=False):
     if plot_show: plt.show()
 
 
+def plot_model_losses(train_file, test_file, out_path, fig_show=True):
+    """
+    Plots model train and test losses on a single plot.
+    """
+    # Read the train losses into a list of floats
+    with open(train_file, 'r') as f:
+        train_losses = [float(line.strip()) for line in f if line.strip()]
+        
+    # Read the test losses into a list of floats
+    with open(test_file, 'r') as f:
+        test_losses = [float(line.strip()) for line in f if line.strip()]
+        
+    # Initialize the plot
+    plt.figure(figsize=(10, 6))
+    
+    # Plot the data
+    plt.plot(train_losses, label='Train Loss', color='blue', linewidth=2)
+    plt.plot(test_losses, label='Test Loss', color='red', linewidth=2, linestyle='--')
+    
+    # Customize the plot with labels, title, and grid
+    plt.title('Interpolant Model Loss Over Time', fontsize=14, fontweight='bold')
+    plt.xlabel('Epoch / Iteration', fontsize=12)
+    plt.ylabel('Loss', fontsize=12)
+    plt.legend(fontsize=12)
+    plt.grid(True, linestyle=':', alpha=0.7)
+    
+    # Display the plot
+    plt.tight_layout()
+    if fig_show:
+        plt.show()
+    else:
+        plt.savefig(os.path.join(out_path, "train_loss.png"))
+
+        
 # Execute Script
 if __name__ == "__main__":
 
@@ -604,9 +641,10 @@ if __name__ == "__main__":
     phase_trans = "G2M_to_G1"
     trajectory_id = 2
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
-    model_path = f"../../../models/interpolant/{test_name}_interp.pt"
+    model_path = f"../../../models/interpolant/{test_name}_interp_model.pt"
+    train_loss_path = f"../../../results/interpolant/{test_name}/losses/{test_name}_loss_train.txt"
     output_path = f"../../../results/interpolant/{test_name}/traj{str(trajectory_id).zfill(3)}"
+    
+    run_diagnostics_plots(model_path, data_path, train_loss_path, output_path, trajectory_id=trajectory_id, plot_show=False)
 
-    run_diagnostics_plots(model_path, data_path, output_path, trajectory_id=trajectory_id, plot_show=False)
-
-        
+    
