@@ -157,7 +157,7 @@ def plot_metacells(stat_file_path, metacell_ids, save_path=None):
         plt.show()
 
 
-def prepare_CM_input_trajectory(metacells_ids, output_path, contact_file_path):
+def prepare_CM_input_trajectory(metacells_ids, output_path, contact_file_path, traj_order=5):
     """
     Prepares the input for a single trajectory in a proper csv format suitable for ChromMovie simulations.
     Contact data is specified through 'contact_file_path' parameter. 
@@ -169,20 +169,50 @@ def prepare_CM_input_trajectory(metacells_ids, output_path, contact_file_path):
 
     df_contact = load_contact_data(contact_file_path)
     
-    # print("Preparing csv contact files for the metacells...")
     for i in range(len(metacells_ids)):
         df_metacell = df_contact[df_contact['cellid'].isin(metacells_ids[i])]
         df_metacell = df_metacell.drop('cellid', axis=1)
-        df_metacell.to_csv(os.path.join(output_path, f'metacell_{str(i).zfill(3)}.csv'), index=False)
+        df_metacell.to_csv(os.path.join(output_path, f'metacell_{str(i).zfill(traj_order)}.csv'), index=False)
 
 
-def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2, m=10):
+def create_cycle_folder(output_path, n, traj_order):
+    """
+    Merges the existing phase trajectory folders into whole cycle trajecotries in a separate "cycle" folder.
+    """
+    phase_folders = [os.path.join(output_path, transition) for transition in ['G1_to_S', 'S_to_G2M', 'G2M_to_G1']]
+    traj_folders = os.listdir(phase_folders[0])
+
+    cycle_path = os.path.join(output_path, "cycle")
+    if not os.path.exists(cycle_path):
+        os.makedirs(cycle_path)
+
+    metacell_files = [f for f in os.listdir(os.path.join(phase_folders[0], traj_folders[0])) if f.startswith("metacell_")]
+    metacell_files.sort()
+    
+    for traj_folder in traj_folders:
+        new_traj_folder = os.path.join(cycle_path, traj_folder)
+        if not os.path.exists(new_traj_folder):
+            os.makedirs(new_traj_folder)
+        new_centers = []
+        k = 0
+        for phase_folder in phase_folders:
+            for i in range(n-1):
+                shutil.copyfile(os.path.join(phase_folder, traj_folder, metacell_files[i]), os.path.join(new_traj_folder, f"metacell_{str(k).zfill(traj_order)}.csv"))
+                k += 1
+            centers = np.loadtxt(os.path.join(phase_folder, traj_folder, f"{traj_folder}_centers_coords.txt"))
+            new_centers.append(centers[:-1,:])
+        new_centers = np.concatenate(new_centers)
+        np.savetxt(os.path.join(new_traj_folder, f"{traj_folder}_centers_coords.txt"), new_centers)
+
+
+def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2, m=10, traj_order=5):
     """
     Prepares the input for n_traj trajectories for each phase transition 
     in a proper csv format suitable for ChromMovie simulations.
     Contact data is specified through 'contact_file_path' parameter. 
     The input data is expected to be in bedpe format with an additional column specifying the cellid.
     The output csv files are saved into the 'output_path'.
+    traj_order denotes the expected highest number of trajectories in the naming convention. traj_order=3 - "trajectory000".
     """
     df = load_stat_file(stat_file_path)
     ids_G1 = df[df['Phase'] == "G1"]['cellid']
@@ -199,25 +229,25 @@ def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2
             get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n, m)
         # G1 -> S
         prepare_CM_input_trajectory(metacells_ids12, \
-                                    os.path.join(output_path, 'G1_to_S', f'trajectory_{str(i).zfill(3)}'), \
-                                    contact_file_path)
-        np.savetxt(os.path.join(output_path, 'G1_to_S', f'trajectory_{str(i).zfill(3)}', \
-                                    f'trajectory_{str(i).zfill(3)}_centers_coords.txt'), centers12)
+                                    os.path.join(output_path, 'G1_to_S', f'trajectory_{str(i).zfill(traj_order)}'), \
+                                    contact_file_path, traj_order=traj_order)
+        np.savetxt(os.path.join(output_path, 'G1_to_S', f'trajectory_{str(i).zfill(traj_order)}', \
+                                    f'trajectory_{str(i).zfill(traj_order)}_centers_coords.txt'), centers12)
         # S -> G2M
         prepare_CM_input_trajectory(metacells_ids23, \
-                                    os.path.join(output_path, 'S_to_G2M', f'trajectory_{str(i).zfill(3)}'), \
-                                    contact_file_path)
-        np.savetxt(os.path.join(output_path, 'S_to_G2M', f'trajectory_{str(i).zfill(3)}', \
-                                    f'trajectory_{str(i).zfill(3)}_centers_coords.txt'), centers23)
+                                    os.path.join(output_path, 'S_to_G2M', f'trajectory_{str(i).zfill(traj_order)}'), \
+                                    contact_file_path, traj_order=traj_order)
+        np.savetxt(os.path.join(output_path, 'S_to_G2M', f'trajectory_{str(i).zfill(traj_order)}', \
+                                    f'trajectory_{str(i).zfill(traj_order)}_centers_coords.txt'), centers23)
         # G2M -> G1
         prepare_CM_input_trajectory(metacells_ids31, \
-                                    os.path.join(output_path, 'G2M_to_G1', f'trajectory_{str(i).zfill(3)}'), \
-                                    contact_file_path)
-        np.savetxt(os.path.join(output_path, 'G2M_to_G1', f'trajectory_{str(i).zfill(3)}', \
-                                    f'trajectory_{str(i).zfill(3)}_centers_coords.txt'), centers31)
+                                    os.path.join(output_path, 'G2M_to_G1', f'trajectory_{str(i).zfill(traj_order)}'), \
+                                    contact_file_path, traj_order=traj_order)
+        np.savetxt(os.path.join(output_path, 'G2M_to_G1', f'trajectory_{str(i).zfill(traj_order)}', \
+                                    f'trajectory_{str(i).zfill(traj_order)}_centers_coords.txt'), centers31)
 
 
-def clean_directory(target_dir):
+def clean_directory(target_dir, traj_order=5):
     """
     Deletes all the files in target_dir from the ChromMovie simulation except for the cif files of the structures from the last step.
     All of the files in the target_dir are expected to contain a specific ChromMovie simulation output.
@@ -238,7 +268,7 @@ def clean_directory(target_dir):
                 frames = os.listdir(item_path)
                 max_step = np.max([int(x.split("_")[0][4:]) for x in frames])
                 for frame in frames:
-                    if not frame.startswith(f"step{str(max_step).zfill(3)}"):
+                    if not frame.startswith(f"step{str(max_step).zfill(traj_order)}"):
                         os.remove(os.path.join(item_path, frame))
                 continue
 
@@ -254,7 +284,7 @@ def clean_directory(target_dir):
     # print(f"Folder {target_dir} cleared successfully")
 
 
-def clean_all_directories(target_dir):
+def clean_all_directories(target_dir, traj_order=5):
     """
     Deletes all the files from the ChromMovie simulation except for the cif files of the structures from the last step and the yaml configuration file.
     This script does it for all of the subdirectories in target_dir folder. 
@@ -262,7 +292,7 @@ def clean_all_directories(target_dir):
     """
     sub_directories = os.listdir(target_dir)
     for subdir in sub_directories:
-        clean_directory(os.path.join(target_dir, subdir))
+        clean_directory(os.path.join(target_dir, subdir, traj_order=traj_order))
 
 
 def main():
@@ -329,6 +359,8 @@ def main():
     ):
         args.out_file = f"../../data/md/{args.test_name}/CM_input/"
 
+    traj_order = int(np.ceil(np.log10(max(args.n_traj, args.n))))+1
+
     prepare_CM_input(
         output_path=args.out_file,
         contact_file_path=args.contact_file,
@@ -336,7 +368,10 @@ def main():
         n_traj=args.n_traj,
         n=args.n,
         m=args.m,
+        traj_order=traj_order
     )
+
+    create_cycle_folder(args.out_file, args.n, traj_order=traj_order)
     
     # Save metadata to a JSON file in the output directory
     run_metadata = {"command": [sys.executable] + sys.argv, "parameters": vars(args)}
