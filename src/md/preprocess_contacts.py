@@ -1,4 +1,6 @@
 import os
+import sys
+import json
 import shutil
 import numpy as np
 import pandas as pd
@@ -335,6 +337,13 @@ def main():
         n=args.n,
         m=args.m,
     )
+    
+    # Save metadata to a JSON file in the output directory
+    run_metadata = {"command": [sys.executable] + sys.argv, "parameters": vars(args)}
+    config_path = os.path.join(args.out_file, f"{args.test_name}_run_config.json")
+    with open(config_path, "w") as f:
+        json.dump(run_metadata, f, indent=4)
+    print(f"Metadata saved in: {config_path}")
 
 
 if __name__ == "__main__":
