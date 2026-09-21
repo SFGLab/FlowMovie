@@ -33,7 +33,22 @@ def compute_loss(mu, x_target, d_target=1, lambda_dist=0.2):
     return loss
 
 
-def train_interpolant(pt_file_path, num_epochs=20, lr=1e-3):
+def compute_metrics(mu, mu_prev, x_target):
+    """
+    Calculates a number of metrics for the current state of the interpolant.
+    """
+    B = mu.size(0)
+    K = (mu.size(1)-2) // 3
+
+    mu_3d = mu[:,:-2].view(B, K, 3)
+    print(mu.shape, mu_3d.shape)
+    print(mu[0, :6])
+    print(mu_3d[:2, :])
+
+    return
+
+
+def train_interpolant(pt_file_path, num_epochs=20, delta_t = 0.01, lr=1e-3):
     if torch.cuda.is_available():
         print("Running on CUDA...")
         device = torch.device("cuda")
@@ -64,6 +79,11 @@ def train_interpolant(pt_file_path, num_epochs=20, lr=1e-3):
             
             # Draw continuous float times t ~ Uniform(0, 1) for each trajectory
             t = torch.rand((B, 1), device=device) # Shape: (B, 1), values in [0.0, 1.0)
+            # t1 = torch.rand((B, 1), device=device) * (1.0 - delta_t)
+            # t2 = t1 + delta_t
+            # x0_cat = torch.cat([x0, x0], dim=0)
+            # x1_cat = torch.cat([x1, x1], dim=0)
+            # t_cat = torch.cat([t1, t2], dim=0).squeeze(1)
 
             # Map continuous time t to closest integer frame indices in range [0, N - 1]
             frame_indices = torch.round(t * (N - 1)).long().squeeze(1) # Shape: (B,)
@@ -73,10 +93,18 @@ def train_interpolant(pt_file_path, num_epochs=20, lr=1e-3):
 
             # Predict Phi and mu
             phi = model(x0, x1, t.squeeze(1)) # (B, D)
+            # phi_cat = model(x0_cat, x1_cat, t_cat)
+            # phi1, phi2 = torch.chunk(phi_cat, 2, dim=0)
+
             mu = (1 - t) * x0 + t * x1 + t * (1 - t) * phi # (B, D)
-            
-            # Compute Loss
+            # mu1 = (1 - t1) * x0 + t1 * x1 + t1 * (1 - t1) * phi1
+            # mu2 = (1 - t2) * x0 + t2 * x1 + t2 * (1 - t2) * phi2
+            # v_est = (mu2 - mu1) / delta_t
+
+            # Compute loss and other metrics
             loss = compute_loss(mu, x_target)
+            # metrics = compute_metrics(mu, v_est, x_target)
+            # return
             
             optimizer.zero_grad()
             loss.backward()
