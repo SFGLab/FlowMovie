@@ -15,16 +15,17 @@ def prepare_CM_configs(test_name, template_path, CM_input_directory, CM_output_d
 
     # Iterate through the target directories
     for phase_transition_folder in os.listdir(CM_input_directory):
-        for trajectory_folder in os.listdir(os.path.join(CM_input_directory, phase_transition_folder)):
+        if os.path.isdir(os.path.join(CM_input_directory, phase_transition_folder)):
+            for trajectory_folder in os.listdir(os.path.join(CM_input_directory, phase_transition_folder)):
 
-            # Update the specific parameters
-            config_data['general']['input'] = os.path.join(CM_input_directory, phase_transition_folder, trajectory_folder)
-            config_data['general']['output'] = os.path.join(CM_output_directory, phase_transition_folder, trajectory_folder)
+                # Update the specific parameters
+                config_data['general']['input'] = os.path.join(CM_input_directory, phase_transition_folder, trajectory_folder)
+                config_data['general']['output'] = os.path.join(CM_output_directory, phase_transition_folder, trajectory_folder)
 
-            # Save the new YAML file
-            save_path = os.path.join(config_out_path, phase_transition_folder+'_'+trajectory_folder+'.yaml')
-            with open(save_path, 'w') as f:
-                yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
+                # Save the new YAML file
+                save_path = os.path.join(config_out_path, phase_transition_folder+'_'+trajectory_folder+'.yaml')
+                with open(save_path, 'w') as f:
+                    yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
 
     print(f"Successfully generated configs in {config_out_path}")
 
@@ -54,14 +55,14 @@ def main():
         "-i",
         "--input-directory",
         type=str,
-        default=f"/home/baneckik/Documents/projects/FlowMovie/data/md/{default_test}/CM_input/",
+        default=None,
         help="Path to input directory",
     )
     parser.add_argument(
         "-o",
         "--output-directory",
         type=str,
-        default=f"/home/baneckik/Documents/projects/FlowMovie/data/md/{default_test}/CM_output/",
+        default=None,
         help="Path to output directory",
     )
 
@@ -69,12 +70,14 @@ def main():
 
     # Automatically update input/output paths if a custom test_name is passed
     # without explicitly providing custom input/output flags.
-    if args.test_name != default_test:
-        if args.input_directory.endswith(f"/{default_test}/CM_input/"):
-            args.input_directory = f"/home/baneckik/Documents/projects/FlowMovie/data/md/{args.test_name}/CM_input/"
-        if args.output_directory.endswith(f"/{default_test}/CM_output/"):
-            args.output_directory = f"/home/baneckik/Documents/projects/FlowMovie/data/md/{args.test_name}/CM_output/"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    FM_dir= os.path.dirname(os.path.dirname(os.path.abspath(script_dir)))
+    if args.input_directory is None:
+        args.input_directory = os.path.join(FM_dir, f"data/md/{args.test_name}/CM_input/")
+    if args.output_directory is None:
+        args.output_directory = os.path.join(FM_dir, f"data/md/{args.test_name}/CM_output/")
 
+    print(f"Generating configs for {args.test_name}...")
     prepare_CM_configs(
         args.test_name,
         args.template_path,
@@ -85,3 +88,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
