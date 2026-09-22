@@ -2,7 +2,7 @@
 data
 models
 results
-configs/md/test02/
+configs/md/test*
 
 # setup
 FlowMovie.egg-info/
