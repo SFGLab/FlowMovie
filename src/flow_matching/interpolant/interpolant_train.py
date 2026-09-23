@@ -3,6 +3,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
+import argparse
 
 from interpolant_DataLoader import TrajectoryDataset
 from interpolant import PhiTransformer
@@ -48,7 +49,7 @@ def compute_metrics(mu, mu_prev, x_target):
     return
 
 
-def train_interpolant(pt_file_path, num_epochs=20, delta_t = 0.01, lr=1e-3):
+def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t = 0.01, lr=1e-3):
     if torch.cuda.is_available():
         print("Running on CUDA...")
         device = torch.device("cuda")
@@ -125,19 +126,63 @@ def train_interpolant(pt_file_path, num_epochs=20, delta_t = 0.01, lr=1e-3):
     return model
 
 
-if __name__ == "__main__":
-    # Execute Training
-    test_name = "test02"
-    phase_trans = "G2M_to_G1"
-    data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
-    trained_model = train_interpolant(data_path, num_epochs=150)
+def main():
+    parser = argparse.ArgumentParser(
+        description="Train an interpolant model and save the checkpoint."
+    )
+    parser.add_argument(
+        "--test-name",
+        "-t",
+        type=str,
+        default="test01",
+        help="Name of the test directory (default: 'test01')",
+    )
+    parser.add_argument(
+        "--phase-trans",
+        "-p",
+        type=str,
+        default="G1_to_S",
+        help="Phase transition identifier (default: 'G1_to_S')",
+    )
+    parser.add_argument(
+        "--num-epochs",
+        "-e",
+        type=int,
+        default=100,
+        help="Number of training epochs (default: 100)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default="../../../data/md",
+        help="Base directory for processed data (default: '../../../data/md')",
+    )
+    parser.add_argument(
+        "--model-dir",
+        type=str,
+        default="../../../models/interpolant",
+        help="Base directory for saving models (default: '../../../models/interpolant')",
+    )
 
-    # Save trained model:
-    model_path = f"../../../models/interpolant/{test_name}_interp_model.pt"
+    args = parser.parse_args()
+
+    data_path = f"{args.data_dir}/{args.test_name}/processed/{args.phase_trans}_data.pt"
+    model_path = f"{args.model_dir}/{args.test_name}_interp_model.pt"
+    if not os.path.exists(args.model_dir):
+        os.makedirs(args.model_dir)
+
+    # Execute Training
+    trained_model = train_interpolant(data_path, test_name=args.test_name, num_epochs=args.num_epochs)
+
+    # Save trained model
     checkpoint = {
         "model_state_dict": trained_model.state_dict(),
         "input_dim": trained_model.input_dim,  # e.g., D = K*3+2
     }
     torch.save(checkpoint, model_path)
     print(f"Model saved successfully to {model_path}")
-    
+
+
+if __name__ == "__main__":
+    main()
+

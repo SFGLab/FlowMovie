@@ -58,3 +58,10 @@ Preprocessing the cif file into pt:
 python preprocess_cif2pt.py -t "test02" -p "cycle"
 ```
 
+Train neural interpolant for specified number of epochs (`-e` flag):
+
+
+```{bash}
+python interpolant_train.py -t test02 -p "cycle" -e 10
+```
+
