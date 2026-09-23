@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
+import argparse
 
 
 def read_cif(cif_path):
@@ -45,7 +46,7 @@ def preprocess_chromatin_trajectories(CM_output_path, CM_input_path, output_file
     CM_input_traj_folders = sorted([f for f in CM_input_root_path.iterdir() if f.is_dir()])
     
     print(f"Found N={len(CM_output_traj_folders)} trajectories.")
-    print(f"Each trajectory has n={len([f for f in os.listdir(CM_input_traj_folders[0]) if f.endswith(".csv")])} frames.")
+    print(f"Each trajectory has n={len([f for f in os.listdir(CM_input_traj_folders[0]) if f.endswith('.csv')])} frames.")
     example_cif = [f for f in os.listdir(os.path.join(CM_output_traj_folders[0], 'frames_cif')) if f.endswith('.cif')][0]
     example_cif_shape = read_cif(os.path.join(CM_output_traj_folders[0], 'frames_cif', example_cif)).shape
     print(f"Each frame is of shape {example_cif_shape}.")
@@ -104,13 +105,42 @@ def preprocess_chromatin_trajectories(CM_output_path, CM_input_path, output_file
     print(f"Successfully saved {len(all_trajectories)} trajectories to {output_file}")
 
 
-if __name__ == "__main__":
-    # Usage:
-    test_name = "test02"
-    phase_trans = "G2M_to_G1"
-    preprocess_chromatin_trajectories(f"../../../data/md/{test_name}/CM_output/{phase_trans}", 
-                                      f"../../../data/md/{test_name}/CM_input/{phase_trans}",
-                                      f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt")
-    
-    
+def main():
+    parser = argparse.ArgumentParser(
+        description="Preprocess chromatin trajectories for a given test and phase transition."
+    )
+    parser.add_argument(
+        "--test-name",
+        "-t",
+        type=str,
+        default="test01",
+        help="Name of the test directory (default: 'test01')",
+    )
+    parser.add_argument(
+        "--phase-trans",
+        "-p",
+        type=str,
+        default="G1_to_S",
+        help="Phase transition identifier (default: 'G1_to_S')",
+    )
+    parser.add_argument(
+        "--base-dir",
+        "-b",
+        type=str,
+        default="../../../data/md",
+        help="Base path to data directory (default: '../../../data/md')",
+    )
 
+    args = parser.parse_args()
+
+    cm_output = f"{args.base_dir}/{args.test_name}/CM_output/{args.phase_trans}"
+    cm_input = f"{args.base_dir}/{args.test_name}/CM_input/{args.phase_trans}"
+    processed_file = f"{args.base_dir}/{args.test_name}/processed/{args.phase_trans}_data.pt"
+
+    preprocess_chromatin_trajectories(cm_output, cm_input, processed_file)
+
+
+if __name__ == "__main__":
+    main()
+
+    
