@@ -22,7 +22,15 @@ Flow Matching:
 Finally:
 * Analyze
 
-## Running ChromMovie for the ready config .yaml files
+## Installing dependencies:
+
+Enable the scripts to import from `src` folder by running the following command in the main FlowMovie folder (where the `pyproject.toml` is located):
+
+```{bash}
+pip install -e .
+```
+
+## Running ChromMovie simulations:
 
 For creating ChromMovie simulations.
 
@@ -38,7 +46,7 @@ Then prepare the configs:
 python prepare_CM_configs.py -t test02
 ```
 
-Finally in the `./scripts` folder run the following (might need to specify the configs directory and ChromMovie folder):
+Finally, in the `./scripts` folder run the following (might need to specify the configs directory and ChromMovie folder):
 
 ```{bash}
 ./run_CM_simulations.sh ../configs/md/test02/ ../../ChromMovie
@@ -52,7 +60,9 @@ for file in /home/baneckik/Documents/projects/2026_FM/FlowMovie/configs/md/test0
 
 ## Running interpolant training:
 
-Preprocessing the cif file into pt:
+Move to `./src/flow_matching/interpolant` folder.
+
+Preprocess the `.cif` file into `.pt`:
 
 ```{bash}
 python preprocess_cif2pt.py -t "test02" -p "cycle"
@@ -64,4 +74,11 @@ Train neural interpolant for specified number of epochs (`-e` flag):
 ```{bash}
 python interpolant_train.py -t test02 -p "cycle" -e 10
 ```
+
+Create diagnostics plots for a given trajectory ID (`-i` flag). Add `--plot-show` flag if figures are to be shown immediately.
+
+```{bash}
+python interpolant_diagnostics.py -t test02 -p "cycle" -i 0
+```
+
 

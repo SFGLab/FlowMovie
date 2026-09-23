@@ -1,10 +1,10 @@
 import os
 import torch
 import numpy as np
-import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+import argparse
 
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
 from src.flow_matching.interpolant.interpolant import PhiTransformer
@@ -459,8 +459,8 @@ def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=False):
     Additionally, a heatmap of RMSD between linear trajectory and original, as well as the difference between the two is created.
     """
     list_pred = [mu_pred[i,:-2].reshape(-1, 3) for i in range(mu_pred.shape[0])]
-    list_orig = [orig_traj[i,:-2].reshape(-1, 3) for i in range(orig_traj.shape[0])]
-    list_linear = [list_orig[0]*(1-t)+list_orig[-1]*t for t in np.linspace(0, 1, len(list_pred))]
+    list_orig = [orig_traj[i,:-2].reshape(-1, 3).cpu() for i in range(orig_traj.shape[0])]
+    list_linear = [(list_orig[0]*(1-t)+list_orig[-1]*t).cpu() for t in np.linspace(0, 1, len(list_pred))]
 
     # Convert lists to 3D arrays: (M, K, 3) and (N, K, 3)
     A = np.array(list_pred)
@@ -534,8 +534,8 @@ def plot_2D_map(mu_pred, orig_traj, output_path, plot_show=False):
     Uses last two coordinates of the prediction to plot the 2D trajectory and compares it to the linear interpolation.
     """
     list_pred = [mu_pred[i,-2:] for i in range(mu_pred.shape[0])]
-    list_orig = [orig_traj[i,-2:] for i in range(orig_traj.shape[0])]
-    list_linear = [list_orig[0]*(1-t)+list_orig[-1]*t for t in np.linspace(0, 1, len(list_pred))]
+    list_orig = [orig_traj[i,-2:].cpu() for i in range(orig_traj.shape[0])]
+    list_linear = [(list_orig[0]*(1-t)+list_orig[-1]*t).cpu() for t in np.linspace(0, 1, len(list_pred))]
 
     pred = np.vstack(list_pred)
     linear = np.vstack(list_linear)
@@ -634,17 +634,74 @@ def plot_model_losses(train_file, test_file, out_path, fig_show=True):
         plt.savefig(os.path.join(out_path, "train_loss.png"))
 
         
-# Execute Script
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run diagnostics plots for a trained interpolant model trajectory."
+    )
+    parser.add_argument(
+        "--test-name",
+        "-t",
+        type=str,
+        default="test01",
+        help="Name of the test directory (default: 'test01')",
+    )
+    parser.add_argument(
+        "--phase-trans",
+        "-p",
+        type=str,
+        default="G1_to_S",
+        help="Phase transition identifier (default: 'G1_to_S')",
+    )
+    parser.add_argument(
+        "--trajectory-id",
+        "-i",
+        type=int,
+        default=0,
+        help="Trajectory ID to analyze (default: 0)",
+    )
+    parser.add_argument(
+        "--plot-show",
+        action="store_true",
+        help="Show interactive plot window (default: False)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default="../../../data/md",
+        help="Base directory for data (default: '../../../data/md')",
+    )
+    parser.add_argument(
+        "--model-dir",
+        type=str,
+        default="../../../models/interpolant",
+        help="Base directory for models (default: '../../../models/interpolant')",
+    )
+    parser.add_argument(
+        "--results-dir",
+        type=str,
+        default="../../../results/interpolant",
+        help="Base directory for output results (default: '../../../results/interpolant')",
+    )
+
+    args = parser.parse_args()
+
+    data_path = f"{args.data_dir}/{args.test_name}/processed/{args.phase_trans}_data.pt"
+    model_path = f"{args.model_dir}/{args.test_name}_interp_model.pt"
+    train_loss_path = f"{args.results_dir}/{args.test_name}/losses/{args.test_name}_loss_train.txt"
+
+    traj_order = len(os.listdir(f"{args.data_dir}/{args.test_name}/CM_output/{args.phase_trans}")[0].split("_"))
+    traj_str = f"traj{str(args.trajectory_id).zfill(traj_order)}"
+    output_path = f"{args.results_dir}/{args.test_name}/{traj_str}"
+
+    run_diagnostics_plots(
+        model_path,
+        data_path,
+        train_loss_path,
+        output_path,
+        trajectory_id=args.trajectory_id,
+        plot_show=args.plot_show,
+    )
+
+
 if __name__ == "__main__":
-
-    test_name = "test02"
-    phase_trans = "G2M_to_G1"
-    trajectory_id = 2
-    data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
-    model_path = f"../../../models/interpolant/{test_name}_interp_model.pt"
-    train_loss_path = f"../../../results/interpolant/{test_name}/losses/{test_name}_loss_train.txt"
-    output_path = f"../../../results/interpolant/{test_name}/traj{str(trajectory_id).zfill(3)}"
-    
-    run_diagnostics_plots(model_path, data_path, train_loss_path, output_path, trajectory_id=trajectory_id, plot_show=False)
-
-    
+    main()

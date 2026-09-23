@@ -264,7 +264,7 @@ def visualize_CM_input(CM_input_path, output_path):
             )
 
         ax.set_title(
-            f"Trajectories - {" ".join(phase_trans.split("_"))}",
+            f"Trajectories - {' '.join(phase_trans.split('_'))}",
             fontsize=14,
             fontweight="bold",
         )

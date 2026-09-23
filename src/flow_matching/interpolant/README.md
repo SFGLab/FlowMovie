@@ -14,10 +14,11 @@ Currently the interpoland model is implemented as a Multi-Head Transformer with 
 
 The training takes the data specified by the `test_name` and `phase_trans` parameters and saves the trained model in the `models/interpolant` folder. 
 
-To train the model:
+Train neural interpolant for specified number of epochs (`-e` flag):
+
 
 ```{bash}
-python interpolant_train.py
+python interpolant_train.py -t test02 -p "cycle" -e 10
 ```
 
 ## interpolant_diagnostics.py
@@ -26,10 +27,10 @@ python interpolant_train.py
 
 The file contains implementation of a number of diagnostics plots including consequtive distance and angle distributions as well as RMSD measurements and 3D structure visualizations. The plots are saved in the `results/interpolant` folder.
 
-To run diagnostics plot for the interpolant model:
+Create diagnostics plots for a given trajectory ID (`-i` flag). Add `--plot-show` flag if figures are to be shown immediately.
 
 ```{bash}
-python interpolant_diagnostics.py
+python interpolant_diagnostics.py -t test02 -p "cycle" -i 0
 ```
 
 ## interpolant_DataLoader.py
@@ -44,10 +45,10 @@ The implementation allows to specify the batch size before loading the data for 
 
 The script takes both the ChromMovie input and output directories (see `README.md` in the `src/md` folder for details). The processed output is saved and stored as a single `.pt` file.
 
-To run the preprocessing of the ChroMovie simulation:
+Preprocess the `.cif` file into `.pt`:
 
 ```{bash}
-python preprocess_cif2pt.py
+python preprocess_cif2pt.py -t "test02" -p "cycle"
 ```
 
 ## pt_file_check.py
