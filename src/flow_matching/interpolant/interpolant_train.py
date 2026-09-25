@@ -9,7 +9,7 @@ from interpolant_DataLoader import TrajectoryDataset
 from interpolant import PhiTransformer
 
 
-def compute_loss(mu, x_target, d_target=1, lambda_dist=0.2):
+def compute_loss(mu, x_target, d_target=1, lambda_dist=0.2, lambda_2d=0.1):
     """
     Calculates the loss function for the interpolant.
     mu is expected to be: mu = (1 - t) * x0 + t * x1 + t * (1 - t) * phi
@@ -28,10 +28,30 @@ def compute_loss(mu, x_target, d_target=1, lambda_dist=0.2):
     distances = torch.linalg.vector_norm(diffs, dim=-1) # Shape: (B, K-1)
     distance_loss = torch.mean((distances - d_target) ** 2)
 
-    # Final loss
-    loss = mse_loss + lambda_dist * distance_loss
+    # 2D Coordinate Distance Loss (Last 2 features)
+    mu_2d = mu[:, -2:]          # Shape: (B, 2)
+    target_2d = x_target[:, -2:]  # Shape: (B, 2)
+    
+    # Euclidean distance (L2 norm) between predicted and target 2D points per sample
+    dist_2d = torch.linalg.vector_norm(mu_2d - target_2d, dim=-1)  # Shape: (B,)
+    loss_2d = torch.mean(dist_2d)
 
-    return loss
+    # Final combined loss
+    # loss = mse_loss + (lambda_dist * distance_loss) + (lambda_2d * loss_2d)
+
+    return mse_loss, lambda_dist * distance_loss, lambda_2d * loss_2d
+
+
+def compute_random_target_loss(mu, x_target, d_target=1.0, lambda_dist=0.2, lambda_2d=0.1):
+    """
+    Computes loss against randomly shuffled targets to establish a baseline.
+    """
+    # Randomly permute the batch indices
+    perm = torch.randperm(x_target.size(0), device=x_target.device)
+    shuffled_target = x_target[perm]
+    
+    # Calculate loss against permuted targets
+    return compute_loss(mu, shuffled_target, d_target, lambda_dist, lambda_2d)
 
 
 def compute_metrics(mu, mu_prev, x_target):
@@ -57,7 +77,7 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
         print("Running on CPU (CUDA not available)...")
         device = torch.device("cpu")
     dataset = TrajectoryDataset(pt_file_path)
-    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=10, shuffle=True)
     
     input_dim = dataset.metadata["num_values"]  # D
     num_frames = dataset.metadata["num_frames"] # N
@@ -68,7 +88,10 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
     avg_losses = []
     model.train()
     for epoch in range(num_epochs):
-        total_loss = 0.0
+        total_loss1 = 0.0
+        total_loss2 = 0.0
+        total_loss3 = 0.0
+                
         
         for batch_trajectories in dataloader:
             # batch_trajectories shape: (Batch_Size, N, D)
@@ -103,7 +126,10 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
             # v_est = (mu2 - mu1) / delta_t
 
             # Compute loss and other metrics
-            loss = compute_loss(mu, x_target)
+            loss1, loss2, loss3 = compute_loss(mu, x_target, d_target=1, lambda_dist=0, lambda_2d=5.00)
+            # loss1, loss2, loss3 = compute_random_target_loss(mu, x_target, d_target=1, lambda_dist=0.1, lambda_2d=0.2)
+                        
+            loss = loss1 + loss2 + loss3
             # metrics = compute_metrics(mu, v_est, x_target)
             # return
             
@@ -111,11 +137,16 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
             loss.backward()
             optimizer.step()
             
-            total_loss += loss.item()
+            total_loss1 += loss1.item()
+            total_loss2 += loss2.item()
+            total_loss3 += loss3.item()          
             
-        avg_loss = total_loss / len(dataloader)
-        avg_losses.append(avg_loss)
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.6f}")
+        avg_loss1 = total_loss1 / len(dataloader)
+        avg_loss2 = total_loss2 / len(dataloader)
+        avg_loss3 = total_loss3 / len(dataloader)
+                
+        avg_losses.append(avg_loss1 + avg_loss2 + avg_loss3)
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss1:.2f} + {avg_loss2:.2f} + {avg_loss3:.2f}")
 
     # Save losses:
     losses_path = f"../../../results/interpolant/{test_name}/losses"
