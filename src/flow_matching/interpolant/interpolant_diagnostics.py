@@ -106,6 +106,9 @@ def run_diagnostics_plots(model_path, data_path, loss_path, output_path, traject
     print("Plotting 2D embedding plot...")
     plot_2D_map(mu_pred, traj, output_path, plot_show=plot_show)
 
+    print("Plotting 2D Phi correction values...")
+    plot_2D_phi(phi_pred, output_path, plot_show=plot_show)
+
     print("Ploting diagnostics gif...")
     # plot_diagnostics_gif(mu_pred, output_path)
 
@@ -599,6 +602,33 @@ def plot_2D_map(mu_pred, orig_traj, output_path, plot_show=False):
     plt.savefig(os.path.join(output_path, "model_2D_map.png"), dpi=300)
     if plot_show: plt.show()
 
+
+def plot_2D_phi(phi_pred, output_path, plot_show=False):
+    """
+    Uses last two coordinates of the phi_pred prediction to plot the correction values for those two coordinates over time.
+    """
+    time_steps = np.arange(phi_pred.shape[0])
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+
+    # First coordinate subplot
+    ax1.plot(time_steps, np.array(phi_pred[:, -2]), color='tab:blue', label='Coordinate 1 (-2)')
+    ax1.set_ylabel('Correction Value')
+    ax1.set_title('Phi Prediction over Time')
+    ax1.grid(True)
+    ax1.legend()
+
+    # Second coordinate subplot
+    ax2.plot(time_steps, np.array(phi_pred[:, -1]), color='tab:orange', label='Coordinate 2 (-1)')
+    ax2.set_xlabel('Time Step')
+    ax2.set_ylabel('Correction Value')
+    ax2.grid(True)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "model_2D_phi.png"), dpi=300)
+    if plot_show: plt.show()
+    
 
 def plot_model_losses(train_file, test_file, out_path, fig_show=True):
     """
