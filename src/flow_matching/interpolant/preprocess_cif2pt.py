@@ -6,6 +6,45 @@ from tqdm import tqdm
 import argparse
 
 
+def kabsch_align(P: np.ndarray, Q: np.ndarray):
+    """
+    Aligns 3D point cloud P onto target point cloud Q.
+    
+    Parameters:
+        P (np.ndarray): (N, 3) array of coordinates to align.
+        Q (np.ndarray): (N, 3) array of reference coordinates.
+        
+    Returns:
+        P_aligned (np.ndarray): Transformed (N, 3) array aligned to Q.
+        R (np.ndarray): Optimal (3, 3) rotation matrix.
+        t (np.ndarray): (3,) translation vector.
+    """
+    # Compute centroids
+    centroid_P = np.mean(P, axis=0)
+    centroid_Q = np.mean(Q, axis=0)
+    
+    # Center points at origin
+    P_c = P - centroid_P
+    Q_c = Q - centroid_Q
+    
+    # Compute cross-covariance matrix
+    H = P_c.T @ Q_c
+    
+    # Perform Singular Value Decomposition
+    U, S, Vt = np.linalg.svd(H)
+    
+    # Calculate rotation matrix and correct for reflection if needed
+    d = np.linalg.det(Vt.T @ U.T)
+    D = np.diag([1.0, 1.0, np.sign(d)])
+    R = Vt.T @ D @ U.T
+    
+    # Calculate translation vector and align P onto Q
+    t = centroid_Q - centroid_P @ R.T
+    P_aligned = P_c @ R.T + centroid_Q
+    
+    return P_aligned, R, t
+
+
 def read_cif(cif_path):
     """
     Reads the cif file from path.
@@ -48,7 +87,8 @@ def preprocess_chromatin_trajectories(CM_output_path, CM_input_path, output_file
     print(f"Found N={len(CM_output_traj_folders)} trajectories.")
     print(f"Each trajectory has n={len([f for f in os.listdir(CM_input_traj_folders[0]) if f.endswith('.csv')])} frames.")
     example_cif = [f for f in os.listdir(os.path.join(CM_output_traj_folders[0], 'frames_cif')) if f.endswith('.cif')][0]
-    example_cif_shape = read_cif(os.path.join(CM_output_traj_folders[0], 'frames_cif', example_cif)).shape
+    example_cif = read_cif(os.path.join(CM_output_traj_folders[0], 'frames_cif', example_cif))
+    example_cif_shape = example_cif.shape
     print(f"Each frame is of shape {example_cif_shape}.")
     print(f"This amounts to K={example_cif_shape[0]} beads and K*3={example_cif_shape[0]*example_cif_shape[1]} values in total (+2 values for center coordinates).\n")
 
@@ -73,7 +113,9 @@ def preprocess_chromatin_trajectories(CM_output_path, CM_input_path, output_file
             try:
                 # Extract (K, 3) coordinates from cif_file, flatten them and merge with center 2D coordinates.
                 # Results coords variable is of (3*K+2,) shape.
-                coords = np.hstack([read_cif(cif_file).flatten(), center_coords])
+                cif_coordinates = read_cif(cif_file)
+                cif_coordinates_aligned, _, _ = kabsch_align(cif_coordinates, example_cif)
+                coords = np.hstack([cif_coordinates_aligned.flatten(), center_coords])
                 
                 if beads_per_structure and coords.shape[0] != beads_per_structure:
                     print(f"Warning: {cif_file} has {coords.shape[0]} atoms, expected {beads_per_structure}")
