@@ -22,12 +22,12 @@ def evaluate_trajectory(model, x0, x1, num_time_steps=100, device="cpu"):
     model.eval()
     t_steps = torch.linspace(0, 1, num_time_steps, device=device).unsqueeze(1) # (T, 1)
     
-    # Repeat x0 and x1 along time step dimension: (T, K*3)
+    # Repeat x0 and x1 along time step dimension: (T, D)
     x0_exp = x0.repeat(num_time_steps, 1)
     x1_exp = x1.repeat(num_time_steps, 1)
     
     # Forward pass
-    phi_pred = model(x0_exp, x1_exp, t_steps.squeeze(1)) # (T, K*3)
+    phi_pred = model(x0_exp, x1_exp, t_steps.squeeze(1)) # (T, D)
     mu_pred = (1 - t_steps) * x0_exp + t_steps * x1_exp + t_steps * (1 - t_steps) * phi_pred
     
     return t_steps.cpu().numpy(), mu_pred.cpu().numpy(), phi_pred.cpu().numpy()
@@ -599,6 +599,7 @@ def plot_2D_map(mu_pred, orig_traj, output_path, plot_show=False):
     ax.set_aspect("equal")
     ax.set_box_aspect(1)
     ax.legend()
+    plt.tight_layout()
     plt.savefig(os.path.join(output_path, "model_2D_map.png"), dpi=300)
     if plot_show: plt.show()
 

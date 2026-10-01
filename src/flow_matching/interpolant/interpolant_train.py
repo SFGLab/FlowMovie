@@ -69,7 +69,7 @@ def compute_metrics(mu, mu_prev, x_target):
     return
 
 
-def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t = 0.01, lr=1e-3):
+def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t = 0.01, lr=1e-5):
     if torch.cuda.is_available():
         print("Running on CUDA...")
         device = torch.device("cuda")
@@ -92,7 +92,8 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
         total_loss2 = 0.0
         total_loss3 = 0.0
                 
-        
+        # single_batch = next(iter(dataloader))
+        # single_batch = single_batch.to(device)
         for batch_trajectories in dataloader:
             # batch_trajectories shape: (Batch_Size, N, D)
             batch_trajectories = batch_trajectories.to(device)
@@ -126,7 +127,7 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
             # v_est = (mu2 - mu1) / delta_t
 
             # Compute loss and other metrics
-            loss1, loss2, loss3 = compute_loss(mu, x_target, d_target=1, lambda_dist=0, lambda_2d=5.00)
+            loss1, loss2, loss3 = compute_loss(mu, x_target, d_target=1, lambda_dist=0.2, lambda_2d=0.7)
             # loss1, loss2, loss3 = compute_random_target_loss(mu, x_target, d_target=1, lambda_dist=0.1, lambda_2d=0.2)
                         
             loss = loss1 + loss2 + loss3
