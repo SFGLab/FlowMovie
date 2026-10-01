@@ -93,12 +93,12 @@ def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
 
     path_gif = os.path.join(viz_path, "traj_FM.gif")
     create_gif(figs, path_gif, duration=duration)
-    print(f"Successfully created gif at {os.path.join(viz_path, "traj_FM.gif")}.")
+    print(f"Successfully created gif at {os.path.join(viz_path, 'traj_FM.gif')}.")
 
 
 if __name__ == "__main__":
-    test_name = "test02"
-    phase_trans = "G2M_to_G1"
+    test_name = "test01"
+    phase_trans = "G1_to_S"
 
     main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300)
 

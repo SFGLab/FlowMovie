@@ -37,13 +37,13 @@ For creating ChromMovie simulations.
 Firstly, from `./src/md` folder prepare the data:
 
 ```{bash}
-python preprocess_contacts.py -t test02 -s "../../data/unique_cells_PATSKI_1k.txt" -c "../../data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe" --n-traj 10 -n 3 -m 10
+python preprocess_contacts.py -t "test02" -s "../../data/unique_cells_PATSKI_1k.txt" -c "../../data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe" --n-traj 10 -n 3 -m 10
 ```
 
 Then prepare the configs:
 
 ```{bash}
-python prepare_CM_configs.py -t test02
+python prepare_CM_configs.py -t "test02"
 ```
 
 Finally, in the `./scripts` folder run the following (might need to specify the configs directory and ChromMovie folder):
@@ -71,13 +71,13 @@ python preprocess_cif2pt.py -t "test02" -p "cycle"
 Train neural interpolant for specified number of epochs (`-e` flag):
 
 ```{bash}
-python interpolant_train.py -t test02 -p "cycle" -e 10
+python interpolant_train.py -t "test02" -p "cycle" -e 10
 ```
 
 Create diagnostics plots for a given trajectory ID (`-i` flag). Add `--plot-show` flag if figures are to be shown immediately.
 
 ```{bash}
-python interpolant_diagnostics.py -t test02 -p "cycle" -i 0
+python interpolant_diagnostics.py -t "test02" -p "cycle" -i 0
 ```
 
 ## Running FM training:
@@ -90,3 +90,8 @@ Train neural Flow Matching velocity field:
 python FM_train.py -t "test02" -p "cycle" -s 100 -b 10 --viz-ot --ot-reg 0.1
 ```
 
+Create vizualization gif for the trained FM velocity field:
+
+```{bash}
+python FM_viz_utils.py -t "test02" -p "cycle"
+```

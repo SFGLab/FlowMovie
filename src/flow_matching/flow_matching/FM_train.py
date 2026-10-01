@@ -291,7 +291,7 @@ def parse_args():
         "-p",
         type=str,
         default="G1_to_S",
-        help="Phase transition identifier (default: 'G2M_to_G1')",
+        help="Phase transition identifier (default: 'G1_to_S')",
     )
     parser.add_argument(
         "--mode",

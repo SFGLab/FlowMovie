@@ -6,6 +6,7 @@ import io
 from PIL import Image
 from scipy.stats import gaussian_kde
 from torch.utils.data import DataLoader
+import argparse
 
 from src.flow_matching.flow_matching.FM_model import MLP
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
@@ -129,7 +130,7 @@ def plot_point_evolution(points_list, xlim, ylim):
     return fig
 
 
-def create_FM_gif(model_path, data_path, out_path):
+def create_FM_gif(model_path, data_path, out_path, num_steps=50, save_every=1, method="rk4", end_time=1.0):
     """
     Main function for creating a gif visualization file for the FM iterated trajectories.
     """
@@ -148,8 +149,8 @@ def create_FM_gif(model_path, data_path, out_path):
     data_x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
 
     structures = iterate_trajectory_pytorch(FM_model, data_x0,
-                                            num_steps=100, save_every=1, 
-                                            method="rk4", end_time=7.0)
+                                            num_steps=num_steps, save_every=save_every, 
+                                            method=method, end_time=end_time)
     structures = [struct[:, -2:] for struct in structures]
 
     data = np.array(structures)
@@ -164,20 +165,69 @@ def create_FM_gif(model_path, data_path, out_path):
     create_gif_from_figs(figs, out_path, duration=50)
 
 
-if __name__ == "__main__":
-    test_name = "test02"
-    phase_trans = "G2M_to_G1"
+def main():
+    parser = argparse.ArgumentParser(
+        description="Plot training losses and generate Flow Matching (FM) trajectory GIF."
+    )
+    parser.add_argument(
+        "--test-name",
+        "-t",
+        type=str,
+        default="test01",
+        help="Name of the test directory (default: 'test01')",
+    )
+    parser.add_argument(
+        "--phase-trans",
+        "-p",
+        type=str,
+        default="G1_to_S",
+        help="Phase transition identifier (default: 'G1_to_S')",
+    )
+    parser.add_argument(
+        "--fig-show",
+        action="store_true",
+        help="Display the loss plot interactively (default: False)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default="../../../data/md",
+        help="Base directory for processed data (default: '../../../data/md')",
+    )
+    parser.add_argument(
+        "--models-dir",
+        type=str,
+        default="../../../models/FM",
+        help="Base directory for FM models (default: '../../../models/FM')",
+    )
+    parser.add_argument(
+        "--results-dir",
+        type=str,
+        default="../../../results/FM",
+        help="Base directory for results and visualizations (default: '../../../results/FM')",
+    )
 
-    viz_path = f"../../../results/FM/{test_name}/losses/"
-    out_path = f"../../../results/FM/{test_name}/viz/losses.png"
-    
-    plot_model_losses(os.path.join(viz_path, f"{test_name}_loss_train.txt"), 
-                      os.path.join(viz_path, f"{test_name}_loss_test.txt"),
-                      out_path, fig_show=False)
+    args = parser.parse_args()
 
-    FM_model_path = f"../../../models/FM/{test_name}_FM_model.pt"
-    data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
-    gif_path = f"../../../results/FM/{test_name}/viz/traj_FM_2D.gif"
+    # Define loss and plot paths
+    viz_path = os.path.join(args.results_dir, args.test_name, "losses")
+    out_path = os.path.join(args.results_dir, args.test_name, "viz", "losses.png")
+
+    train_loss_file = os.path.join(viz_path, f"{args.test_name}_loss_train.txt")
+    test_loss_file = os.path.join(viz_path, f"{args.test_name}_loss_test.txt")
+
+    plot_model_losses(train_loss_file, test_loss_file, out_path, fig_show=args.fig_show)
+
+    # Define model, data, and gif paths
+    FM_model_path = os.path.join(args.models_dir, f"{args.test_name}_FM_model.pt")
+    data_path = os.path.join(
+        args.data_dir, args.test_name, "processed", f"{args.phase_trans}_data.pt"
+    )
+    gif_path = os.path.join(args.results_dir, args.test_name, "viz", "traj_FM_2D.gif")
 
     create_FM_gif(FM_model_path, data_path, gif_path)
+
+
+if __name__ == "__main__":
+    main()
 
