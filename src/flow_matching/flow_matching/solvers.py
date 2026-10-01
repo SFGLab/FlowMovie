@@ -12,7 +12,7 @@ def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="
     """
     x0: torch.Tensor of shape (3m,) or (m, 3)
     """
-    device = x0.device if isinstance(x0, torch.Tensor) else torch.device("cpu")
+    device = x0.device if isinstance(x0, torch.Tensor) else torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if not isinstance(x0, torch.Tensor):
         x0 = torch.tensor(x0, dtype=torch.float32, device=device)
         
@@ -52,9 +52,9 @@ def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
     resolution, p and duration are the gif parameters.
     """
     # Load pretrained model:
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = f"../../../models/FM/{test_name}_FM_model.pt"
-    model = MLP(layers=5, channels_data=7976, channels=512)
+    model = MLP(layers=5, channels_data=7976, channels=512).to(device)
     ckpt = torch.load(model_path, map_location=device)
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()

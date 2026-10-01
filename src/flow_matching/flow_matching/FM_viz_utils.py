@@ -130,12 +130,12 @@ def plot_point_evolution(points_list, xlim, ylim):
     return fig
 
 
-def create_FM_gif(model_path, data_path, out_path, num_steps=50, save_every=1, method="rk4", end_time=1.0):
+def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, method="rk4", end_time=0.1):
     """
     Main function for creating a gif visualization file for the FM iterated trajectories.
     """
-    device = "cpu"
-    FM_model = MLP(layers=5, channels_data=7976, channels=512)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    FM_model = MLP(layers=5, channels_data=7976, channels=512).to(device)
     checkpoint = torch.load(model_path, map_location=device)
     FM_model.load_state_dict(checkpoint["model_state_dict"])
     FM_model.eval()
