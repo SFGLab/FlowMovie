@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+import argparse
 
 from src.flow_matching.interpolant.interpolant import PhiTransformer
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
@@ -99,10 +100,11 @@ def get_trajectory(phi_model, x0, x1, num_steps=10):
     Uses evenly distributed times between 0 and 1.
     Returns a list of structures of length num_steps from x0 to x1.
     """
-    time_steps = torch.linspace(0, 1, steps=num_steps)
+    time_steps = torch.linspace(0, 1, steps=num_steps, device=x0.device)
     steps = []
     for t in time_steps:
-        xt = compute_flow_matching_xt(phi_model, x0, x1, torch.full((x0.shape[0],), t)[:, None])
+        time_step = torch.full((x0.shape[0],), t, device=x0.device)[:, None]
+        xt = compute_flow_matching_xt(phi_model, x0, x1, time_step)
         steps.append(xt)
     return steps
 
@@ -117,11 +119,11 @@ def visualize_batch_OT_plan(x0, x1, x1_OT, batch_id, output_path, phi_model, num
     fig, ax = plt.subplots(1, 2, figsize=(12, 6))
 
     for i in range(x0.shape[0]):
-        traj_x = [step[i,-2].detach().numpy() for step in steps_preOT]
-        traj_y = [step[i,-1].detach().numpy() for step in steps_preOT]
+        traj_x = [step[i,-2].cpu().detach().numpy() for step in steps_preOT]
+        traj_y = [step[i,-1].cpu().detach().numpy() for step in steps_preOT]
         ax[0].plot(traj_x, traj_y, color="red", alpha=0.2, lw=5)
-        traj_x = [step[i,-2].detach().numpy() for step in steps_postOT]
-        traj_y = [step[i,-1].detach().numpy() for step in steps_postOT]
+        traj_x = [step[i,-2].cpu().detach().numpy() for step in steps_postOT]
+        traj_y = [step[i,-1].cpu().detach().numpy() for step in steps_postOT]
         ax[1].plot(traj_x, traj_y, color="red", alpha=0.2, lw=5)
         
     ax[0].set_title(
@@ -194,10 +196,12 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
 
         # Optimal Transport plan (modifies x1 so as to create OT):
         x1_OT = get_OT_x1(x0, x1, reg=OT_reg)
-        if viz_OT:
-            print("Visualizing the OT plan...")
+        if viz_OT and i == 0:
+            print("\nVisualizing the OT plan for the first iteration...")
+            viz_path = f"../../../results/FM/{test_name}/viz"
+            if not os.path.exists(viz_path): os.makedirs(viz_path)
             visualize_batch_OT_plan(x0, x1, x1_OT, i, \
-                                    f"../../../results/FM/{test_name}/viz", phi_model, num_steps=4)
+                                    viz_path, phi_model, num_steps=4)
         
         # target velocity and xt with or without Phi interpolant correction:
         if mode == "linear":
@@ -237,10 +241,11 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
 
 def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, OT_reg=0.1, viz_OT=False):
     # Execute training
-    model = MLP(layers=5, channels_data=7976, channels=512)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = MLP(layers=5, channels_data=7976, channels=512).to(device)
     optim = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
-    phi_model_path = f"../../../models/interpolant/{test_name}_interp.pt"
+    phi_model_path = f"../../../models/interpolant/{test_name}_interp_model.pt"
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     
     losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path, test_name=test_name,
@@ -255,9 +260,10 @@ def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, 
     np.savetxt(os.path.join(losses_path, f"{test_name}_loss_test.txt"), losses_test)
 
     # Save trained model:
-    model_path = f"../../../models/FM/{test_name}_FM_model.pt"
-    if not os.path.exists(model_path):
-        os.makedirs(model_path)
+    model_dir = f"../../../models/FM"
+    model_path = os.path.join(model_dir, f"{test_name}_FM_model.pt")
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
     checkpoint = {
         "model_state_dict": model.state_dict(),
         "channels_data": model.channels_data,
@@ -269,11 +275,72 @@ def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, 
     print(f"Model saved successfully to {model_path}")
 
 
-if __name__ == "__main__":
-    test_name = "test02"
-    phase_trans = "G2M_to_G1"
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run training pipeline with optimal transport (OT) regularization."
+    )
+    parser.add_argument(
+        "--test-name",
+        "-t",
+        type=str,
+        default="test01",
+        help="Name of the test directory (default: 'test01')",
+    )
+    parser.add_argument(
+        "--phase-trans",
+        "-p",
+        type=str,
+        default="G1_to_S",
+        help="Phase transition identifier (default: 'G2M_to_G1')",
+    )
+    parser.add_argument(
+        "--mode",
+        "-m",
+        type=str,
+        default="phi",
+        help="Execution mode (default: 'phi')",
+    )
+    parser.add_argument(
+        "--training-steps",
+        "-s",
+        type=int,
+        default=100,
+        help="Number of training steps (default: 100)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        "-b",
+        type=int,
+        default=50,
+        help="Batch size (default: 50)",
+    )
+    parser.add_argument(
+        "--ot-reg",
+        "-r",
+        type=float,
+        default=0.01,
+        help="OT regularization parameter (default: 0.01)",
+    )
+    parser.add_argument(
+        "--viz-ot",
+        action="store_true",
+        help="Enable OT visualization (default: False)",
+    )
 
-    main(test_name, phase_trans, mode="phi", 
-         training_steps=100, batch_size=50, OT_reg=0.01, viz_OT=False)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    main(
+        args.test_name,
+        args.phase_trans,
+        mode=args.mode,
+        training_steps=args.training_steps,
+        batch_size=args.batch_size,
+        OT_reg=args.ot_reg,
+        viz_OT=args.viz_ot,
+    )
 
     

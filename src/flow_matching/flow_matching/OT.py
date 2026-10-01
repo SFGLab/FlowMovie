@@ -117,7 +117,7 @@ class SinkhornDistance(nn.Module):
         M = torch.exp(-cost_matrix / self.reg)
         u = torch.ones_like(source)
         v = torch.ones_like(target)
-
+        
         P_prev = u.unsqueeze(1) * M * v.unsqueeze(0) 
 
         for _ in range(self.max_iter):
@@ -151,9 +151,8 @@ def get_OT_x1(x0, x1, eps=1e-4, reg=0.1, max_iter=100):
     cost_matrix = get_cost_matrix(x0, x1)
     # Define uniform marginal distributions
     B = x0.shape[0]
-    a = torch.ones(B) / B  # source weights
-    b = torch.ones(B) / B  # target weights
-
+    a = torch.ones(B, device=x0.device) / B  # source weights
+    b = torch.ones(B, device=x0.device) / B  # target weights
     # Run Sinkhorn
     sinkhorn = SinkhornDistance(eps=eps, reg=reg, max_iter=max_iter)
     P, min_cost = sinkhorn(cost_matrix, a, b)

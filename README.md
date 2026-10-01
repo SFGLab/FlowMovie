@@ -70,7 +70,6 @@ python preprocess_cif2pt.py -t "test02" -p "cycle"
 
 Train neural interpolant for specified number of epochs (`-e` flag):
 
-
 ```{bash}
 python interpolant_train.py -t test02 -p "cycle" -e 10
 ```
@@ -81,4 +80,13 @@ Create diagnostics plots for a given trajectory ID (`-i` flag). Add `--plot-show
 python interpolant_diagnostics.py -t test02 -p "cycle" -i 0
 ```
 
+## Running FM training:
+
+Move to `./src/flow_matching/flow_matching` folder.
+
+Train neural Flow Matching velocity field:
+
+```{bash}
+python FM_train.py -t "test02" -p "cycle" -s 100 -b 10 --viz-ot --ot-reg 0.1
+```
 
