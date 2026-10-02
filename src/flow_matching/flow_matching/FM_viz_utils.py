@@ -130,6 +130,109 @@ def plot_point_evolution(points_list, xlim, ylim):
     return fig
 
 
+def plot_2d_velocity_field(model_path, data_path, t, out_path, grid_size=20, sample_idx=0, fig_show=False):
+    """
+    Plots a 2D velocity field for the last two dimensions of a dataset.
+    
+    Args:
+        model: PyTorch model returning velocity field (expects x of shape (N, D) and time t)
+        data_x0: Tensor of shape (B, D) representing dataset samples
+        t: Scalar or tensor representing time step
+        grid_size: Resolution of the vector field grid (grid_size x grid_size arrows)
+        sample_idx: Index of sample in data_x0 to use for the fixed D-2 dimensions
+        device: 'cpu' or 'cuda'
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    FM_model = MLP(layers=5, channels_data=7976, channels=512).to(device)
+    checkpoint = torch.load(model_path, map_location=device)
+    FM_model.load_state_dict(checkpoint["model_state_dict"])
+    FM_model.eval()
+
+    dataset = TrajectoryDataset(data_path)
+    full_batch_size = len(dataset)
+    dataloader = DataLoader(dataset, batch_size=full_batch_size, shuffle=True)
+    batch_trajectories = next(iter(dataloader)).to(device)
+    data_x0 = batch_trajectories[:, 0, :]
+    
+    data_x0 = data_x0.to(device)
+
+    # Determine bounds for the last two dimensions (index -2 and -1)
+    x_min, x_max = data_x0[:, -2].min().item(), data_x0[:, -2].max().item()
+    y_min, y_max = data_x0[:, -1].min().item(), data_x0[:, -1].max().item()
+
+    # Add 10% padding around data boundaries
+    pad_x = (x_max - x_min) * 0.1 if x_max != x_min else 1.0
+    pad_y = (y_max - y_min) * 0.1 if y_max != y_min else 1.0
+
+    # Build 2D grid coordinates
+    grid_x = torch.linspace(x_min - pad_x, x_max + pad_x, grid_size, device=device)
+    grid_y = torch.linspace(y_min - pad_y, y_max + pad_y, grid_size, device=device)
+    mesh_x, mesh_y = torch.meshgrid(grid_x, grid_y, indexing="ij")
+
+    # Flatten coordinates into a batch of 2D points: shape (grid_size * grid_size, 2)
+    grid_2d = torch.stack([mesh_x.reshape(-1), mesh_y.reshape(-1)], dim=-1)
+    num_points = grid_2d.shape[0]
+
+    # Construct input tensor for shape (num_points, D)
+    D = data_x0.shape[1]
+    if D > 2:
+        # Freeze prefix dimensions using the values from sample_idx
+        prefix = data_x0[sample_idx, :-2].unsqueeze(0).expand(num_points, -1)
+        grid_input = torch.cat([prefix, grid_2d], dim=-1)
+    else:
+        grid_input = grid_2d
+
+    # Prepare time tensor matching grid batch size
+    if isinstance(t, (int, float)):
+        t_tensor = torch.full((num_points, 1), fill_value=t, device=device)
+    else:
+        t_tensor = t.to(device).expand(num_points, -1)
+
+    # Evaluate velocities through the model
+    with torch.no_grad():
+        # Adapt signature if your model takes model(t, x) instead of model(x, t)
+        velocities = FM_model(grid_input, t_tensor)
+
+    # Extract horizontal (dim -2) and vertical (dim -1) velocity components
+    v_x = velocities[:, -2].reshape(grid_size, grid_size).cpu().numpy()
+    v_y = velocities[:, -1].reshape(grid_size, grid_size).cpu().numpy()
+
+    X = mesh_x.cpu().numpy()
+    Y = mesh_y.cpu().numpy()
+
+    # Calculate magnitude for coloring arrow strength
+    speed = np.hypot(v_x, v_y)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Quiver plot draws the directional arrows colored by speed
+    q = ax.quiver(X, Y, v_x, v_y, speed, cmap="viridis", angles="xy", scale_units="xy")
+    fig.colorbar(q, ax=ax, label="Velocity Magnitude (Strength)")
+
+    # Overlay original data points projected onto the last two dimensions
+    ax.scatter(
+        data_x0[:, -2].cpu().numpy(),
+        data_x0[:, -1].cpu().numpy(),
+        c="red",
+        alpha=0.3,
+        s=15,
+        label="Data ($x_0$)",
+    )
+
+    ax.set_xlabel("Dimension D-2")
+    ax.set_ylabel("Dimension D-1")
+    ax.set_title(f"Velocity Field at t = {t}")
+    ax.legend()
+    ax.grid(True, linestyle="--", alpha=0.4)
+    plt.tight_layout()
+    if fig_show:
+        plt.show()
+    else:
+        plt.savefig(out_path)
+        print(f"Succcessfully saved 2D velocity field png at {out_path}")
+
+
 def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, method="rk4", end_time=0.1):
     """
     Main function for creating a gif visualization file for the FM iterated trajectories.
@@ -223,8 +326,10 @@ def main():
     data_path = os.path.join(
         args.data_dir, args.test_name, "processed", f"{args.phase_trans}_data.pt"
     )
+    vel_path = os.path.join(args.results_dir, args.test_name, "viz", "velocity_field_FM_2D.png")
     gif_path = os.path.join(args.results_dir, args.test_name, "viz", "traj_FM_2D.gif")
 
+    plot_2d_velocity_field(FM_model_path, data_path, 0, vel_path)
     create_FM_gif(FM_model_path, data_path, gif_path)
 
 
