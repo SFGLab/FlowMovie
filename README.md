@@ -90,8 +90,9 @@ Train neural Flow Matching velocity field:
 python FM_train.py -t "test02" -p "cycle" -s 100 -b 10 --viz-ot --ot-reg 0.1
 ```
 
-Create vizualization gif for the trained FM velocity field:
+Create vizualization gifs for the trained FM velocity field:
 
 ```{bash}
 python FM_viz_utils.py -t "test02" -p "cycle"
+python solvers.py -t "test02" -p "cycle" -r 2000000 --p 20 -d 300
 ```

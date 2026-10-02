@@ -1,6 +1,7 @@
 import os
 import torch
 from torch.utils.data import DataLoader
+import argparse
 
 from src.flow_matching.flow_matching.FM_model import MLP
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
@@ -15,7 +16,7 @@ def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="
     device = x0.device if isinstance(x0, torch.Tensor) else torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if not isinstance(x0, torch.Tensor):
         x0 = torch.tensor(x0, dtype=torch.float32, device=device)
-        
+    
     t_span = torch.linspace(0.0, end_time, num_steps, device=device)
     dt = t_span[1] - t_span[0]
     
@@ -25,14 +26,14 @@ def iterate_trajectory_pytorch(model, x0, num_steps=100, save_every=10, method="
     model.eval()
     for i in range(len(t_span) - 1):
         t = t_span[i]
-        
+
         if method == "euler":
             # Simple Forward Euler: x_next = x + v * dt
             v = model(x_curr, t.unsqueeze(0))
             x_curr = x_curr + v * dt
             
         elif method == "rk4":
-            # 4th Order Runge-Kutta for higher precision
+            # 4th Order Runge-Kutta
             k1 = model(x_curr, t.unsqueeze(0))
             k2 = model(x_curr + 0.5 * dt * k1, (t + 0.5 * dt).unsqueeze(0))
             k3 = model(x_curr + 0.5 * dt * k2, (t + 0.5 * dt).unsqueeze(0))
@@ -50,6 +51,8 @@ def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
     """
     Based on the FM model from test_name and phase_trans, creates a vizualization gif.
     resolution, p and duration are the gif parameters.
+    Parameter p signifies the percentage (integer from 0 to 100) of the points to exclude due to them lying to close to the center. 
+    By default p=0, meaning that all of the points will be shown.
     """
     # Load pretrained model:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -96,9 +99,58 @@ def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
     print(f"Successfully created gif at {os.path.join(viz_path, 'traj_FM.gif')}.")
 
 
-if __name__ == "__main__":
-    test_name = "test01"
-    phase_trans = "G1_to_S"
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run pipeline with specified resolution and duration settings."
+    )
+    parser.add_argument(
+        "--test-name",
+        "-t",
+        type=str,
+        default="test01",
+        help="Name of the test directory (default: 'test01')",
+    )
+    parser.add_argument(
+        "--phase-trans",
+        "-p",
+        type=str,
+        default="G1_to_S",
+        help="Phase transition identifier (default: 'G1_to_S')",
+    )
+    parser.add_argument(
+        "--resolution",
+        "-r",
+        type=int,
+        default=2_000_000,
+        help="Resolution value (default: 2000000)",
+    )
+    parser.add_argument(
+        "--percent-hidden",
+        "--p",
+        dest="p",
+        type=int,
+        default=0,
+        help="Percent of the beads not to be visualized (value from 0 to 100, default: 0)",
+    )
+    parser.add_argument(
+        "--duration",
+        "-d",
+        type=int,
+        default=300,
+        help="Duration parameter (default: 300)",
+    )
 
-    main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    print(args.test_name)
+    main(
+        args.test_name,
+        args.phase_trans,
+        resolution=args.resolution,
+        p=args.p,
+        duration=args.duration,
+    )
 
