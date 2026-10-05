@@ -201,7 +201,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
             viz_path = f"../../../results/FM/{test_name}/viz"
             if not os.path.exists(viz_path): os.makedirs(viz_path)
             visualize_batch_OT_plan(x0, x1, x1_OT, i, \
-                                    viz_path, phi_model, num_steps=4)
+                                    viz_path, phi_model, num_steps=N)
         
         # target velocity and xt with or without Phi interpolant correction:
         if mode == "linear":

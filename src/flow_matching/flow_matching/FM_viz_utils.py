@@ -45,7 +45,7 @@ def plot_model_losses(train_file, test_file, out_path, fig_show=True):
         plt.show()
     else:
         plt.savefig(out_path)
-        print(f"Succcessfully saved losses png at {out_path}")
+        print(f"Successfully saved losses png at {out_path}")
 
 
 def create_gif_from_figs(figs, filename, duration=300):
@@ -230,7 +230,7 @@ def plot_2d_velocity_field(model_path, data_path, t, out_path, grid_size=20, sam
         plt.show()
     else:
         plt.savefig(out_path)
-        print(f"Succcessfully saved 2D velocity field png at {out_path}")
+        print(f"Successfully saved 2D velocity field png at {out_path}")
 
 
 def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, method="rk4", end_time=0.1):
