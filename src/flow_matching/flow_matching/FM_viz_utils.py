@@ -152,7 +152,9 @@ def plot_2d_velocity_field(model_path, data_path, t, out_path, grid_size=20, sam
     full_batch_size = len(dataset)
     dataloader = DataLoader(dataset, batch_size=full_batch_size, shuffle=True)
     batch_trajectories = next(iter(dataloader)).to(device)
-    data_x0 = batch_trajectories[:, 0, :]
+    _, N, _ = batch_trajectories.shape
+    frame_id = int(t*(N-1))
+    data_x0 = batch_trajectories[:, frame_id, :]
     
     data_x0 = data_x0.to(device)
 
@@ -160,9 +162,10 @@ def plot_2d_velocity_field(model_path, data_path, t, out_path, grid_size=20, sam
     x_min, x_max = data_x0[:, -2].min().item(), data_x0[:, -2].max().item()
     y_min, y_max = data_x0[:, -1].min().item(), data_x0[:, -1].max().item()
 
-    # Add 10% padding around data boundaries
-    pad_x = (x_max - x_min) * 0.1 if x_max != x_min else 1.0
-    pad_y = (y_max - y_min) * 0.1 if y_max != y_min else 1.0
+    # Add padding around data boundaries
+    padding = 0.3
+    pad_x = (x_max - x_min) * padding if x_max != x_min else 1.0
+    pad_y = (y_max - y_min) * padding if y_max != y_min else 1.0
 
     # Build 2D grid coordinates
     grid_x = torch.linspace(x_min - pad_x, x_max + pad_x, grid_size, device=device)
@@ -220,16 +223,16 @@ def plot_2d_velocity_field(model_path, data_path, t, out_path, grid_size=20, sam
         label="Data ($x_0$)",
     )
 
-    ax.set_xlabel("Dimension D-2")
-    ax.set_ylabel("Dimension D-1")
-    ax.set_title(f"Velocity Field at t = {t}")
+    ax.set_xlabel("X coordinate")
+    ax.set_ylabel("Y coordinate")
+    ax.set_title(f"Velocity Field at t = {t} for frame ({frame_id}/{N})")
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
     if fig_show:
         plt.show()
     else:
-        plt.savefig(out_path)
+        plt.savefig(os.path.join(out_path, f"velocity_field_FM_2D_{str(int(t*100)).zfill(3)}.png"))
         print(f"Successfully saved 2D velocity field png at {out_path}")
 
 
@@ -265,7 +268,7 @@ def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, m
     figs = []
     for i in range(1, len(structures)):
         figs.append(plot_point_evolution(structures[:i], xlim, ylim))
-    create_gif_from_figs(figs, out_path, duration=50)
+    create_gif_from_figs(figs, out_path, duration=200)
 
 
 def main():
@@ -286,6 +289,13 @@ def main():
         default="G1_to_S",
         help="Phase transition identifier (default: 'G1_to_S')",
     )
+    parser.add_argument(
+            "--end-time",
+            "-e",
+            type=float,
+            default=0.0,
+            help="Target time for the gif simulation (default: 0.0)",
+        )
     parser.add_argument(
         "--fig-show",
         action="store_true",
@@ -326,11 +336,13 @@ def main():
     data_path = os.path.join(
         args.data_dir, args.test_name, "processed", f"{args.phase_trans}_data.pt"
     )
-    vel_path = os.path.join(args.results_dir, args.test_name, "viz", "velocity_field_FM_2D.png")
+    vel_path = os.path.join(args.results_dir, args.test_name, "viz")
     gif_path = os.path.join(args.results_dir, args.test_name, "viz", "traj_FM_2D.gif")
 
-    plot_2d_velocity_field(FM_model_path, data_path, 0, vel_path)
-    create_FM_gif(FM_model_path, data_path, gif_path)
+    for t in np.linspace(0, args.end_time, 5):
+        plot_2d_velocity_field(FM_model_path, data_path, t, vel_path)
+    create_FM_gif(FM_model_path, data_path, gif_path, \
+                  num_steps=10, save_every=1, method="rk4", end_time=args.end_time)
 
 
 if __name__ == "__main__":

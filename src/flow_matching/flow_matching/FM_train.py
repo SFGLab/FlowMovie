@@ -60,14 +60,14 @@ def compute_flow_matching_target_fast(phi_model, x0, x1, t):
     """
     Vectorized computation of d(Phi)/dt for high-dimensional feature spaces.
 
-    x0: (Batch, K*3)
-    x1: (Batch, K*3)
+    x0: (Batch, D)
+    x1: (Batch, D)
     t:  (Batch, 1) in [0, 1]
     """
     t = t.clone().detach().requires_grad_(True) # (Batch, 1)
     
     # Forward pass
-    phi = phi_model(x0, x1, t.squeeze(1)) # (Batch, K*3)
+    phi = phi_model(x0, x1, t.squeeze(1)) # (Batch, D)
     
     # Compute d(Phi)/dt using autograd.grad with a dummy vector product
     # Since Phi only depends on t scalar per batch item:
@@ -189,7 +189,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
     losses_test = []
     for i in pbar:
         # ======== calculate train loss ======== 
-        ids = torch.randint(x0_train.size(0), (B,))
+        ids = torch.randint(x0_train.size(0), (batch_size,))
         x0 = x0_train[ids]
         x1 = x1_train[ids]
         t = torch.rand((x1.size(0), 1), device=device)
@@ -298,7 +298,7 @@ def parse_args():
         "-m",
         type=str,
         default="phi",
-        help="Execution mode (default: 'phi')",
+        help="Interpolation mode (default: 'phi')",
     )
     parser.add_argument(
         "--training-steps",
