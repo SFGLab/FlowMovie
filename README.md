@@ -90,9 +90,9 @@ Train neural Flow Matching velocity field:
 python FM_train.py -t "test02" -p "cycle" -s 100 -b 10 --viz-ot --ot-reg 0.1
 ```
 
-Create vizualization gifs for the trained FM velocity field:
+Create vizualization gifs for the trained FM velocity field. Trajectories will be iterated over time from `0` to the end time specified by the `-e` flag and number of plots specified by the `-n` flag.
 
 ```{bash}
-python FM_viz_utils.py -t "test02" -p "cycle"
+python FM_viz_utils.py -t "test02" -p "cycle" -e 1.0 -n 10
 python solvers.py -t "test02" -p "cycle" -r 2000000 --p 20 -d 300
 ```

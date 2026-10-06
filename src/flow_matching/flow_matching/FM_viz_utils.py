@@ -130,13 +130,15 @@ def plot_point_evolution(points_list, xlim, ylim):
     return fig
 
 
-def plot_2d_velocity_field(model_path, data_path, t, out_path, grid_size=20, sample_idx=0, fig_show=False):
+def plot_2d_velocity_field(model_path, data_path, plot_idx, n_plots, t, out_path, grid_size=20, sample_idx=0, fig_show=False):
     """
     Plots a 2D velocity field for the last two dimensions of a dataset.
     
     Args:
         model: PyTorch model returning velocity field (expects x of shape (N, D) and time t)
         data_x0: Tensor of shape (B, D) representing dataset samples
+        plot_idx: Index of the plot
+        n_plots: Total number of 2D plots
         t: Scalar or tensor representing time step
         grid_size: Resolution of the vector field grid (grid_size x grid_size arrows)
         sample_idx: Index of sample in data_x0 to use for the fixed D-2 dimensions
@@ -161,7 +163,7 @@ def plot_2d_velocity_field(model_path, data_path, t, out_path, grid_size=20, sam
     # Determine bounds for the last two dimensions (index -2 and -1)
     x_min, x_max = data_x0[:, -2].min().item(), data_x0[:, -2].max().item()
     y_min, y_max = data_x0[:, -1].min().item(), data_x0[:, -1].max().item()
-
+    
     # Add padding around data boundaries
     padding = 0.3
     pad_x = (x_max - x_min) * padding if x_max != x_min else 1.0
@@ -232,8 +234,8 @@ def plot_2d_velocity_field(model_path, data_path, t, out_path, grid_size=20, sam
     if fig_show:
         plt.show()
     else:
-        plt.savefig(os.path.join(out_path, f"velocity_field_FM_2D_{str(int(t*100)).zfill(3)}.png"))
-        print(f"Successfully saved 2D velocity field png at {out_path}")
+        plt.savefig(os.path.join(out_path, f"velocity_field_FM_2D_{str(int(plot_idx)).zfill(3)}.png"))
+        print(f"Successfully saved 2D velocity field png ({plot_idx+1}/{n_plots}) at {out_path}")
 
 
 def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, method="rk4", end_time=0.1):
@@ -290,12 +292,19 @@ def main():
         help="Phase transition identifier (default: 'G1_to_S')",
     )
     parser.add_argument(
-            "--end-time",
-            "-e",
-            type=float,
-            default=0.0,
-            help="Target time for the gif simulation (default: 0.0)",
-        )
+        "--end-time",
+        "-e",
+        type=float,
+        default=0.0,
+        help="Target time for the gif simulation (default: 0.0)",
+    )
+    parser.add_argument(
+        "--n-plots",
+        "-n",
+        type=int,
+        default=5,
+        help="Number of 2D velocity field plots to create (default: 5)",
+    )
     parser.add_argument(
         "--fig-show",
         action="store_true",
@@ -339,8 +348,8 @@ def main():
     vel_path = os.path.join(args.results_dir, args.test_name, "viz")
     gif_path = os.path.join(args.results_dir, args.test_name, "viz", "traj_FM_2D.gif")
 
-    for t in np.linspace(0, args.end_time, 5):
-        plot_2d_velocity_field(FM_model_path, data_path, t, vel_path)
+    for i, t in enumerate(np.linspace(0, args.end_time, args.n_plots)):
+        plot_2d_velocity_field(FM_model_path, data_path, i, args.n_plots, t, vel_path)
     create_FM_gif(FM_model_path, data_path, gif_path, \
                   num_steps=10, save_every=1, method="rk4", end_time=args.end_time)
 
