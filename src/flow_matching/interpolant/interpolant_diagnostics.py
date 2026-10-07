@@ -1,5 +1,6 @@
 import os
 import torch
+from tqdm import tqdm
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -108,6 +109,10 @@ def run_diagnostics_plots(model_path, data_path, loss_path, output_path, traject
 
     print("Plotting 2D Phi correction values...")
     plot_2D_phi(phi_pred, output_path, plot_show=plot_show)
+
+    print("Plotting interpolant velocity fields...")
+    for i, t in tqdm(enumerate(np.linspace(0, 1, 10))):
+        plot_interpolant_velocity_field(model, trajectories, output_path, idx=i, t=t, device=device)
 
     print("Ploting diagnostics gif...")
     # plot_diagnostics_gif(mu_pred, output_path)
@@ -602,6 +607,121 @@ def plot_2D_map(mu_pred, orig_traj, output_path, plot_show=False):
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, "model_2D_map.png"), dpi=300)
     if plot_show: plt.show()
+
+
+def plot_interpolant_velocity_field(
+    phi_model, trajectories,
+    output_path, idx, t, trajectory_id=0,
+    delta_t=1e-3, grid_size=20,
+    device="cpu", plot_show=False
+):
+    """
+    Plots the velocity field of a neural interpolant mu(x0, x1, t) 
+    for the last two dimensions.
+    
+    Args:
+        phi_model: Model accepting (x0, x1, t) and returning x_t of shape (B, D)
+        trajectories: List of tensors of shape (N, D) representing initial trajectories
+        output_path: Output folder
+        idx: Index of the image to be displayed in the name of the output file
+        t: Float scalar for current time step in [0, 1]
+        trajectory_id: index of the trajectory to be used as a reference for the velocity field
+        delta_t: Time step size for finite difference estimation
+        device: 'cpu' or 'cuda'
+    """   
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    phi_model.eval()
+
+    # Target x1 and reference x0
+    ref_traj = trajectories[trajectory_id].to(device)
+    x1_fixed = ref_traj[-1:]  # Shape: (1, D)
+    x0_ref = ref_traj[0:1]    # Shape: (1, D)
+    D = x0_ref.shape[1]
+
+    all_x0 = torch.stack([tr[0] for tr in trajectories], dim=0).to(device)
+    all_x1 = torch.stack([tr[-1] for tr in trajectories], dim=0).to(device)
+    all_points = torch.cat([all_x0, all_x1], dim=0)
+
+    # Establish plot domain bounds
+    x_min, x_max = all_points[:, -2].min().item(), all_points[:, -2].max().item()
+    y_min, y_max = all_points[:, -1].min().item(), all_points[:, -1].max().item()
+
+    pad_x = (x_max - x_min) * 0.1 if x_max != x_min else 1.0
+    pad_y = (y_max - y_min) * 0.1 if y_max != y_min else 1.0
+
+    target_x_min, target_x_max = x_min - pad_x, x_max + pad_x
+    target_y_min, target_y_max = y_min - pad_y, y_max + pad_y
+
+    # Create regular spatial grid directly in x_t coordinates
+    grid_x = torch.linspace(target_x_min, target_x_max, grid_size, device=device)
+    grid_y = torch.linspace(target_y_min, target_y_max, grid_size, device=device)
+    mesh_x, mesh_y = torch.meshgrid(grid_x, grid_y, indexing="ij")
+    grid_2d = torch.stack([mesh_x.reshape(-1), mesh_y.reshape(-1)], dim=-1)
+    num_points = grid_2d.shape[0]
+
+    # Expand prefix dimensions from x0_ref
+    if D > 2:
+        prefix = x0_ref[:, :-2].expand(num_points, -1)
+        grid_xt = torch.cat([prefix, grid_2d], dim=-1)
+    else:
+        grid_xt = grid_2d
+
+    grid_x1 = x1_fixed.expand(num_points, -1)
+
+    # Invert linearly to find x0 for each x_t grid position
+    t_effective = min(float(t), 0.95)
+    grid_x0 = (grid_xt - t_effective * grid_x1) / (1.0 - t_effective)
+
+    # Evaluate velocity around time t
+    with torch.no_grad():
+        t_prev = torch.full((num_points, 1), fill_value=float(t - delta_t), device=device)
+        t_next = torch.full((num_points, 1), fill_value=float(t + delta_t), device=device)
+
+        x_next = predict_mu(phi_model, grid_x0, grid_x1, t_next)
+        x_prev = predict_mu(phi_model, grid_x0, grid_x1, t_prev)
+
+        v_t = (x_next - x_prev) / (2 * delta_t)
+
+    # Convert to NumPy
+    # Anchor quiver at the uniform grid_2d coordinates (ensures 100% frame coverage)
+    pos_x = grid_2d[:, -2].cpu().numpy()
+    pos_y = grid_2d[:, -1].cpu().numpy()
+    v_t_np = v_t.cpu().numpy()
+
+    v_x, v_y = v_t_np[:, -2], v_t_np[:, -1]
+    speed = np.hypot(v_x, v_y)
+
+    # Plotting
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Quiver plot anchored directly on the uniform spatial grid
+    q = ax.quiver(pos_x, pos_y, v_x, v_y, speed, cmap="viridis", angles="xy", scale_units="xy")
+    fig.colorbar(q, ax=ax, label="Velocity Strength (Speed)")
+
+    # Overlay x0 and x1 points
+    x0_np = all_x0.cpu().numpy()
+    x1_np = all_x1.cpu().numpy()
+    x1_x, x1_y = x1_fixed[0, -2].item(), x1_fixed[0, -1].item()
+
+    ax.scatter(x0_np[:, -2], x0_np[:, -1], c="blue", alpha=0.4, label="$x_0$ (Start)", s=20)
+    ax.scatter(x1_np[:, -2], x1_np[:, -1], c="red", alpha=0.4, label="$x_1$ (End)", s=20)
+    ax.scatter(x1_x, x1_y, c="black", marker="*", s=120, label="Target $x_1$", zorder=5)
+
+    ax.set_xlim(target_x_min, target_x_max)
+    ax.set_ylim(target_y_min, target_y_max)
+
+    ax.set_xlabel("Dimension D-2")
+    ax.set_ylabel("Dimension D-1")
+    ax.set_title(f"Spatial Grid Flowing to Target $x_1$ (Traj #{trajectory_id}) at $t={t:.2f}$")
+    ax.legend(loc="upper right")
+    ax.grid(True, linestyle="--", alpha=0.4)
+
+    plt.savefig(os.path.join(output_path, f"model_2D_velocity_field_{str(idx).zfill(3)}.png"), dpi=300)
+    if plot_show: 
+        plt.show()
+    plt.close(fig)
 
 
 def plot_2D_phi(phi_pred, output_path, plot_show=False):
