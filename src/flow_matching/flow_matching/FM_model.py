@@ -53,4 +53,15 @@ class MLP(nn.Module):
         x = self.out_projection(x)
         return x
 
-        
+
+def load_FM_model(model_path, device):
+    """
+    Function for loading of the trained FM model.
+    """
+    checkpoint = torch.load(model_path, map_location=device)
+    FM_model = MLP(layers=checkpoint["layers"], 
+                    channels_data=checkpoint["channels_data"], 
+                    channels=checkpoint["channels"]).to(device)
+    FM_model.load_state_dict(checkpoint["model_state_dict"])
+    return FM_model
+

@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 import argparse
 
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
-from src.flow_matching.interpolant.interpolant import PhiTransformer
+from src.flow_matching.interpolant.interpolant import load_phi_model
 
 from src.md.visualization_utils import visualize_whole_genome, create_gif, get_chrom_sizes
 
@@ -69,10 +69,8 @@ def run_diagnostics_plots(model_path, data_path, loss_path, output_path, traject
         os.makedirs(output_path)
 
     # Load model checkpoint
-    checkpoint = torch.load(model_path, map_location=device)
-    model = PhiTransformer(input_dim=checkpoint["input_dim"]).to(device)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.eval()
+    phi_model = load_phi_model(model_path, device)
+    phi_model.eval()
 
     # Load dataset
     data = torch.load(data_path)
@@ -86,7 +84,7 @@ def run_diagnostics_plots(model_path, data_path, loss_path, output_path, traject
     x1 = traj[-1:, :]  # Last frame (1, K*3+2)
 
     # Predict dense trajectory
-    t_grid, mu_pred, phi_pred = evaluate_trajectory(model, x0, x1, num_time_steps=20, device=device)
+    t_grid, mu_pred, phi_pred = evaluate_trajectory(phi_model, x0, x1, num_time_steps=20, device=device)
 
     # Preparing diagnostics
     print("Plotting losses plot...")
@@ -112,7 +110,7 @@ def run_diagnostics_plots(model_path, data_path, loss_path, output_path, traject
 
     print("Plotting interpolant velocity fields...")
     for i, t in tqdm(enumerate(np.linspace(0, 1, 10))):
-        plot_interpolant_velocity_field(model, trajectories, output_path, idx=i, t=t, device=device)
+        plot_interpolant_velocity_field(phi_model, trajectories, output_path, idx=i, t=t, device=device)
 
     print("Ploting diagnostics gif...")
     # plot_diagnostics_gif(mu_pred, output_path)
@@ -131,10 +129,8 @@ def plot_diagnostics(model_path, data_path, output_path, num_samples=5, time_res
         os.makedirs(output_path)
 
     # Load model checkpoint
-    checkpoint = torch.load(model_path, map_location=device)
-    model = PhiTransformer(input_dim=checkpoint["input_dim"]).to(device)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.eval()
+    phi_model = load_phi_model(model_path, device)
+    phi_model.eval()
 
     # Load dataset
     dataset = TrajectoryDataset(data_path)
@@ -157,7 +153,7 @@ def plot_diagnostics(model_path, data_path, output_path, num_samples=5, time_res
         x1 = traj[-1:, :]  # Last frame (1, K*3)
 
         # Predict dense trajectory
-        t_grid, mu_pred, phi_pred = evaluate_trajectory(model, x0, x1, num_time_steps=time_resolution, device=device)
+        t_grid, mu_pred, phi_pred = evaluate_trajectory(phi_model, x0, x1, num_time_steps=time_resolution, device=device)
 
         # Ground truth matching via linear interpolation index
         gt_indices = np.round(t_grid.squeeze() * (N - 1)).astype(int)

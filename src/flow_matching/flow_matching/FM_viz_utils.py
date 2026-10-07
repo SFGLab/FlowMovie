@@ -8,7 +8,7 @@ from scipy.stats import gaussian_kde
 from torch.utils.data import DataLoader
 import argparse
 
-from src.flow_matching.flow_matching.FM_model import MLP
+from src.flow_matching.flow_matching.FM_model import load_FM_model
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
 from src.flow_matching.flow_matching.solvers import iterate_trajectory_pytorch
 
@@ -145,9 +145,7 @@ def plot_2d_velocity_field(model_path, data_path, plot_idx, n_plots, t, out_path
         device: 'cpu' or 'cuda'
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    FM_model = MLP(layers=5, channels_data=7976, channels=512).to(device)
-    checkpoint = torch.load(model_path, map_location=device)
-    FM_model.load_state_dict(checkpoint["model_state_dict"])
+    FM_model = load_FM_model(model_path, device)
     FM_model.eval()
 
     dataset = TrajectoryDataset(data_path)
@@ -227,7 +225,7 @@ def plot_2d_velocity_field(model_path, data_path, plot_idx, n_plots, t, out_path
 
     ax.set_xlabel("X coordinate")
     ax.set_ylabel("Y coordinate")
-    ax.set_title(f"Velocity Field at t = {t} for frame ({frame_id}/{N})")
+    ax.set_title(f"Velocity Field at t = {t:.2f} for frame ({frame_id}/{N})")
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
@@ -236,6 +234,7 @@ def plot_2d_velocity_field(model_path, data_path, plot_idx, n_plots, t, out_path
     else:
         plt.savefig(os.path.join(out_path, f"velocity_field_FM_2D_{str(int(plot_idx)).zfill(3)}.png"))
         print(f"Successfully saved 2D velocity field png ({plot_idx+1}/{n_plots}) at {out_path}")
+    plt.close(fig)
 
 
 def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, method="rk4", end_time=0.1):
@@ -243,9 +242,7 @@ def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, m
     Main function for creating a gif visualization file for the FM iterated trajectories.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    FM_model = MLP(layers=5, channels_data=7976, channels=512).to(device)
-    checkpoint = torch.load(model_path, map_location=device)
-    FM_model.load_state_dict(checkpoint["model_state_dict"])
+    FM_model = load_FM_model(model_path, device)
     FM_model.eval()
 
     dataset = TrajectoryDataset(data_path)

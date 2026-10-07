@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 import argparse
 
-from src.flow_matching.flow_matching.FM_model import MLP
+from src.flow_matching.flow_matching.FM_model import load_FM_model
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
 from src.md.visualization_utils import visualize_whole_genome, create_gif
 
@@ -57,10 +57,8 @@ def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
     # Load pretrained model:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = f"../../../models/FM/{test_name}_FM_model.pt"
-    model = MLP(layers=5, channels_data=7976, channels=512).to(device)
-    ckpt = torch.load(model_path, map_location=device)
-    model.load_state_dict(ckpt["model_state_dict"])
-    model.eval()
+    FM_model = load_FM_model(model_path, device)
+    FM_model.eval()
 
     # Load the data:
     pt_file_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
@@ -73,7 +71,7 @@ def main(test_name, phase_trans, resolution=2_000_000, p=0, duration=300):
     data_x0 = batch_trajectories[:, 0, :]   # First frame (B, D)
 
     # Iterating the trajectory:
-    structures = iterate_trajectory_pytorch(model, data_x0)
+    structures = iterate_trajectory_pytorch(FM_model, data_x0)
     structures = [struct[0,:-2] for struct in structures]
     structures = [struct.reshape((int(struct.shape[0]/3), 3)) for struct in structures]
 

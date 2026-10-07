@@ -67,4 +67,13 @@ class PhiTransformer(nn.Module):
         phi = self.out_head(pooled)
         return phi
 
-    
+
+def load_phi_model(model_path, device):
+    """
+    Function for loading of the trained phi interpolant model.
+    """
+    checkpoint = torch.load(model_path, map_location=device)
+    phi_model = PhiTransformer(input_dim=checkpoint["input_dim"]).to(device)
+    phi_model.load_state_dict(checkpoint["model_state_dict"])
+    return phi_model
+
