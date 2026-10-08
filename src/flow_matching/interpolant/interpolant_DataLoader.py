@@ -26,6 +26,9 @@ class TrajectoryDataset(Dataset):
     def get_n(self):
         return self.metadata["num_frames"]
 
+    def get_D(self):
+        return self.metadata["num_values"]
+
     def get_num_beads(self):
         return self.metadata["num_beads"]
 

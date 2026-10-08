@@ -237,15 +237,18 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
     return losses_train, losses_test
 
 
-def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, OT_reg=0.1, viz_OT=False):
-    # Execute training
+def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, 
+         layers=5, channels_h=512, channels_t=512, OT_reg=0.1, lr=1e-3, viz_OT=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ContinuousFlowMLP(layers=5, channels_data=7976, channels=512).to(device)
-    optim = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
     phi_model_path = f"../../../models/interpolant/{test_name}_interp_model.pt"
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
-    
+    D = TrajectoryDataset(data_path).get_D() # data dimension e.g. D = 3*K + 2
+
+    model = ContinuousFlowMLP(channels_data=D, layers=layers, channels=channels_h, channels_t=channels_t).to(device)
+    optim = torch.optim.AdamW(model.parameters(), lr=lr)
+
+    # Execute training
     losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path, test_name=test_name,
                                 mode=mode, training_steps=training_steps, 
                                 batch_size=batch_size, OT_reg=OT_reg, viz_OT=viz_OT)
@@ -313,6 +316,34 @@ def parse_args():
         help="Batch size (default: 50)",
     )
     parser.add_argument(
+        "--layers",
+        "-l",
+        type=int,
+        default=5,
+        help="Number of NN layers (default: 5)",
+    )
+    parser.add_argument(
+        "--channels-h",
+        "-ch",
+        type=int,
+        default=512,
+        help="Number of channels in hidden NN layers (default: 512)",
+    )
+    parser.add_argument(
+        "--channels-t",
+        "-ct",
+        type=int,
+        default=512,
+        help="Number of channels in time embedding NN layers (default: 512)",
+    )
+    parser.add_argument(
+        "--learning-rate",
+        "-lr",
+        type=float,
+        default=1e-3,
+        help="Learning rate for the NN optimizer (default: 1e-3)",
+    )
+    parser.add_argument(
         "--ot-reg",
         "-r",
         type=float,
@@ -338,6 +369,10 @@ if __name__ == "__main__":
         training_steps=args.training_steps,
         batch_size=args.batch_size,
         OT_reg=args.ot_reg,
+        layers=args.layers, 
+        channels_h=args.channels_h, 
+        channels_t=args.channels_t, 
+        lr=args.learning_rate,
         viz_OT=args.viz_ot,
     )
 
