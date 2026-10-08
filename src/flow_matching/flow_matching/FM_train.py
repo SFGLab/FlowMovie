@@ -6,10 +6,10 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import argparse
 
-from src.flow_matching.interpolant.interpolant import PhiTransformer
+from src.flow_matching.interpolant.interpolant import load_phi_model
 from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
 from src.flow_matching.flow_matching.OT import get_OT_x1
-from src.flow_matching.flow_matching.FM_model import MLP
+from src.flow_matching.flow_matching.FM_model import ContinuousFlowMLP
 
 
 def compute_flow_matching_xt(phi_model, x0, x1, t):
@@ -178,9 +178,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
     x0_test, x1_test = data_x0[test_idx], data_x1[test_idx]
 
     # prepare interpolant Phi
-    checkpoint = torch.load(phi_model_path, map_location=device)
-    phi_model = PhiTransformer(input_dim=checkpoint["input_dim"]).to(device)
-    phi_model.load_state_dict(checkpoint["model_state_dict"])
+    phi_model = load_phi_model(phi_model_path, device)
     phi_model.eval()
 
     # main training loop
@@ -242,7 +240,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
 def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, OT_reg=0.1, viz_OT=False):
     # Execute training
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = MLP(layers=5, channels_data=7976, channels=512).to(device)
+    model = ContinuousFlowMLP(layers=5, channels_data=7976, channels=512).to(device)
     optim = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
     phi_model_path = f"../../../models/interpolant/{test_name}_interp_model.pt"
