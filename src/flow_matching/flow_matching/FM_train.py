@@ -147,7 +147,38 @@ def visualize_batch_OT_plan(x0, x1, x1_OT, batch_id, output_path, phi_model, num
     print(f"Saved: {filename}")
 
 
-def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", training_steps=500, batch_size=10, OT_reg=0.1, viz_OT=False):
+def calculate_FM_loss(prediction, target_ut, reg_lambda=0.01, penalty_type="l2"):
+    """
+    Calculates Flow Matching loss with velocity magnitude regularization.
+
+    Args:
+        prediction (torch.Tensor): Model velocity prediction, shape (B, D)
+        target_ut (torch.Tensor): Target velocity vector, shape (B, D)
+        reg_lambda (float): Regularization strength weight (e.g., 1e-3 to 1e-1)
+        penalty_type (str): 'l2' for Kinetic Energy, 'l1' for peak dampening
+
+    Returns:
+        torch.Tensor: Scalar loss tensor
+    """
+    # Standard Flow Matching MSE loss
+    fm_loss = ((prediction - target_ut) ** 2).mean()
+
+    # Regularization penalty on velocity magnitudes
+    if penalty_type == "l2":
+        # Kinetic Energy Penalty: sum over dimensions D, average over batch B
+        reg_loss = (prediction**2).sum(dim=-1).mean()
+    elif penalty_type == "l1":
+        # L1 Norm Penalty: dampens extreme velocity spikes more aggressively
+        reg_loss = torch.abs(prediction).sum(dim=-1).mean()
+    else:
+        raise ValueError(f"Unknown penalty_type: {penalty_type}")
+
+    total_loss = fm_loss + reg_lambda * reg_loss
+    return total_loss
+
+
+def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", training_steps=500, batch_size=10, 
+             reg_lambda=0.05, penalty_type="l1", OT_reg=0.1, viz_OT=False):
     """
     Main function for the execution of the training of the FM model.
     Returns losses for the training and test set.
@@ -209,7 +240,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
             xt, target_ut = compute_flow_matching_target_fast(phi_model, x0, x1_OT, t)
 
         pred = model(xt, t)
-        loss_train = ((target_ut - pred)**2).mean()
+        loss_train = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
     
         # ======== calculate test loss ======== 
         # Optimal Transport plan
@@ -224,7 +255,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
             xt, target_ut = compute_flow_matching_target_fast(phi_model, x1_test_OT, x1_test, t)
         
         pred = model(xt, t)
-        loss_test = ((target_ut - pred)**2).mean()
+        loss_test = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
     
         # ======== train ======== 
         loss_train.backward()
