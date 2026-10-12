@@ -236,6 +236,49 @@ def plot_2d_velocity_field(model_path, data_path, plot_idx, n_plots, t, out_path
         print(f"Successfully saved 2D velocity field png ({plot_idx+1}/{n_plots}) at {out_path}")
     plt.close(fig)
 
+    return v_x, v_y
+
+
+def plot_2d_velocity_field_changes(velocities_x, velocities_y, out_path, end_time=1.0, fig_show=False):
+    """Plots the time evolution of velocity matrices across grid points.
+    
+    Args:
+    velocities_x: list of length n_plots with array elements of shape (m, m)
+    velocities_y: list of length n_plots with array elements of shape (m, m)
+    out_path: Target folder for the image save
+    end_time: numeric, end time value for the x-axis
+    """
+    n_plots = len(velocities_x)
+    time = np.linspace(0, end_time, n_plots)
+
+    # Stack lists into 3D arrays and flatten spatial grid into (n_plots, m*m)
+    vx_flat = np.array(velocities_x).reshape(n_plots, -1)
+    vy_flat = np.array(velocities_y).reshape(n_plots, -1)
+
+    fig, (ax_x, ax_y) = plt.subplots(1, 2, figsize=(12, 5), sharex=True)
+
+    # Plotting a 2D array of shape (N, K) against an X vector of shape (N,)
+    # automatically creates K distinct line plots over time.
+    ax_x.plot(time, vx_flat, alpha=0.5)
+    ax_x.set_title("X Velocities Evolution")
+    ax_x.set_xlabel("Time")
+    ax_x.set_ylabel("$v_x$")
+    ax_x.grid(True)
+
+    ax_y.plot(time, vy_flat, alpha=0.5)
+    ax_y.set_title("Y Velocities Evolution")
+    ax_y.set_xlabel("Time")
+    ax_y.set_ylabel("$v_y$")
+    ax_y.grid(True)
+
+    plt.tight_layout()
+    if fig_show:
+        plt.show()
+    else:
+        plt.savefig(os.path.join(out_path, f"velocity_field_FM_2D_changes.png"))
+        print(f"Successfully saved 2D velocity field changes png at {out_path}")
+    plt.close(fig)
+    
 
 def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, method="rk4", end_time=0.1):
     """
@@ -345,8 +388,13 @@ def main():
     vel_path = os.path.join(args.results_dir, args.test_name, "viz")
     gif_path = os.path.join(args.results_dir, args.test_name, "viz", "traj_FM_2D.gif")
 
+    velocities_x, velocities_y = [], []
     for i, t in enumerate(np.linspace(0, args.end_time, args.n_plots)):
-        plot_2d_velocity_field(FM_model_path, data_path, i, args.n_plots, t, vel_path)
+        vx, vy = plot_2d_velocity_field(FM_model_path, data_path, i, args.n_plots, t, vel_path, fig_show=args.fig_show)
+        velocities_x.append(vx)
+        velocities_y.append(vy)
+    plot_2d_velocity_field_changes(velocities_x, velocities_y, vel_path, args.end_time, fig_show=args.fig_show)
+
     create_FM_gif(FM_model_path, data_path, gif_path, \
                   num_steps=10, save_every=1, method="rk4", end_time=args.end_time)
 
