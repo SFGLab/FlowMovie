@@ -153,7 +153,7 @@ def plot_2d_velocity_field(model_path, data_path, plot_idx, n_plots, t, out_path
     dataloader = DataLoader(dataset, batch_size=full_batch_size, shuffle=True)
     batch_trajectories = next(iter(dataloader)).to(device)
     _, N, _ = batch_trajectories.shape
-    frame_id = int(t*(N-1))
+    frame_id = min(N-1, int(t*(N-1)))
     data_x0 = batch_trajectories[:, frame_id, :]
     
     data_x0 = data_x0.to(device)
