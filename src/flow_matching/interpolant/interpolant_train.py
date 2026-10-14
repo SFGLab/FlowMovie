@@ -9,7 +9,8 @@ from interpolant_DataLoader import TrajectoryDataset
 from interpolant import PhiTransformer
 
 
-def compute_loss(mu, x_target, d_target=1, lambda_dist=0.2, lambda_2d=0.1):
+def compute_loss(mu, x_target, t, x0, x1, phi, d_target=1, vel_penalty_type = "l1",
+                 lambda_dist=0.2, lambda_2d=0.1, lambda_vel=0.1):
     """
     Calculates the loss function for the interpolant.
     mu is expected to be: mu = (1 - t) * x0 + t * x1 + t * (1 - t) * phi
@@ -36,10 +37,19 @@ def compute_loss(mu, x_target, d_target=1, lambda_dist=0.2, lambda_2d=0.1):
     dist_2d = torch.linalg.vector_norm(mu_2d - target_2d, dim=-1)  # Shape: (B,)
     loss_2d = torch.mean(dist_2d)
 
+    # Velocity Loss
+    velocity = (x1 - x0) + (1 - 2 * t) * phi
+    if vel_penalty_type == "l2":
+        velocity_loss = torch.mean(velocity ** 2)
+    elif vel_penalty_type == "l1":
+        velocity_loss = torch.mean(torch.abs(velocity))
+    else:
+        raise ValueError(f"Unknown penalty_type: {vel_penalty_type}")
+
     # Final combined loss
     # loss = mse_loss + (lambda_dist * distance_loss) + (lambda_2d * loss_2d)
 
-    return mse_loss, lambda_dist * distance_loss, lambda_2d * loss_2d
+    return mse_loss, lambda_dist * distance_loss, lambda_2d * loss_2d, lambda_vel * velocity_loss
 
 
 def compute_random_target_loss(mu, x_target, d_target=1.0, lambda_dist=0.2, lambda_2d=0.1):
@@ -91,6 +101,7 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
         total_loss1 = 0.0
         total_loss2 = 0.0
         total_loss3 = 0.0
+        total_loss4 = 0.0
                 
         # single_batch = next(iter(dataloader))
         # single_batch = single_batch.to(device)
@@ -127,12 +138,12 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
             # v_est = (mu2 - mu1) / delta_t
 
             # Compute loss and other metrics
-            loss1, loss2, loss3 = compute_loss(mu, x_target, d_target=1, lambda_dist=0.2, lambda_2d=0.7)
+            loss1, loss2, loss3, loss4 = compute_loss(mu, x_target, t, x0, x1, phi, 
+                                               d_target=1, lambda_dist=0.2, lambda_2d=1.7, lambda_vel=0.9)
             # loss1, loss2, loss3 = compute_random_target_loss(mu, x_target, d_target=1, lambda_dist=0.1, lambda_2d=0.2)
                         
-            loss = loss1 + loss2 + loss3
+            loss = loss1 + loss2 + loss3 + loss4
             # metrics = compute_metrics(mu, v_est, x_target)
-            # return
             
             optimizer.zero_grad()
             loss.backward()
@@ -140,14 +151,16 @@ def train_interpolant(pt_file_path, test_name="test01", num_epochs=20, delta_t =
             
             total_loss1 += loss1.item()
             total_loss2 += loss2.item()
-            total_loss3 += loss3.item()          
+            total_loss3 += loss3.item()
+            total_loss4 += loss4.item()         
             
         avg_loss1 = total_loss1 / len(dataloader)
         avg_loss2 = total_loss2 / len(dataloader)
         avg_loss3 = total_loss3 / len(dataloader)
+        avg_loss4 = total_loss4 / len(dataloader)     
                 
         avg_losses.append(avg_loss1 + avg_loss2 + avg_loss3)
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss1:.2f} + {avg_loss2:.2f} + {avg_loss3:.2f}")
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss1:.2f} + {avg_loss2:.2f} + {avg_loss3:.2f}  + {avg_loss4:.2f}")
 
     # Save losses:
     losses_path = f"../../../results/interpolant/{test_name}/losses"
