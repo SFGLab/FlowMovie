@@ -177,8 +177,8 @@ def calculate_FM_loss(prediction, target_ut, reg_lambda=0.01, penalty_type="l2")
     return total_loss
 
 
-def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", training_steps=500, batch_size=10, 
-             reg_lambda=0.05, penalty_type="l1", OT_reg=0.1, viz_OT=False):
+def train_FM(FM_model, phi_model_path, optim, pt_file_path, test_name, mode="phi", training_steps=500, batch_size=10, 
+             reg_lambda=0.01, penalty_type="l2", OT_reg=0.1, viz_OT=False):
     """
     Main function for the execution of the training of the FM model.
     Returns losses for the training and test set.
@@ -239,7 +239,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
         elif mode == "phi":
             xt, target_ut = compute_flow_matching_target_fast(phi_model, x0, x1_OT, t)
 
-        pred = model(xt, t)
+        pred = FM_model(xt, t)
         loss_train = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
     
         # ======== calculate test loss ======== 
@@ -254,7 +254,7 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
         elif mode == "phi":
             xt, target_ut = compute_flow_matching_target_fast(phi_model, x1_test_OT, x1_test, t)
         
-        pred = model(xt, t)
+        pred = FM_model(xt, t)
         loss_test = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
     
         # ======== train ======== 
@@ -269,20 +269,22 @@ def train_FM(model, phi_model_path, optim, pt_file_path, test_name, mode="phi", 
 
 
 def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10, 
-         layers=5, channels_h=512, channels_t=512, OT_reg=0.1, lr=1e-3, viz_OT=False):
+         layers=5, channels_h=512, channels_t=512, 
+         reg_lambda=0.01, penalty_type="l2", OT_reg=0.1, lr=1e-3, viz_OT=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     phi_model_path = f"../../../models/interpolant/{test_name}_interp_model.pt"
     data_path = f"../../../data/md/{test_name}/processed/{phase_trans}_data.pt"
     D = TrajectoryDataset(data_path).get_D() # data dimension e.g. D = 3*K + 2
 
-    model = ContinuousFlowMLP(channels_data=D, layers=layers, channels=channels_h, channels_t=channels_t).to(device)
-    optim = torch.optim.AdamW(model.parameters(), lr=lr)
+    FM_model = ContinuousFlowMLP(channels_data=D, layers=layers, channels=channels_h, channels_t=channels_t).to(device)
+    optim = torch.optim.AdamW(FM_model.parameters(), lr=lr)
 
     # Execute training
-    losses_train, losses_test = train_FM(model, phi_model_path, optim, data_path, test_name=test_name,
+    losses_train, losses_test = train_FM(FM_model, phi_model_path, optim, data_path, test_name=test_name,
                                 mode=mode, training_steps=training_steps, 
-                                batch_size=batch_size, OT_reg=OT_reg, viz_OT=viz_OT)
+                                batch_size=batch_size, reg_lambda=reg_lambda, penalty_type=penalty_type,
+                                OT_reg=OT_reg, viz_OT=viz_OT)
 
     # Save losses:
     losses_path = f"../../../results/FM/{test_name}/losses"
@@ -292,19 +294,19 @@ def main(test_name, phase_trans, mode="phi", training_steps=100, batch_size=10,
     np.savetxt(os.path.join(losses_path, f"{test_name}_loss_test.txt"), losses_test)
 
     # Save trained model:
-    model_dir = f"../../../models/FM"
-    model_path = os.path.join(model_dir, f"{test_name}_FM_model.pt")
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
+    FM_model_dir = f"../../../models/FM"
+    FM_model_path = os.path.join(FM_model_dir, f"{test_name}_FM_model.pt")
+    if not os.path.exists(FM_model_dir):
+        os.makedirs(FM_model_dir)
     checkpoint = {
-        "model_state_dict": model.state_dict(),
-        "channels_data": model.channels_data,
-        "layers": model.layers,
-        "channels": model.channels,
-        "channels_t": model.channels_t
+        "model_state_dict": FM_model.state_dict(),
+        "channels_data": FM_model.channels_data,
+        "layers": FM_model.layers,
+        "channels": FM_model.channels,
+        "channels_t": FM_model.channels_t
     }
-    torch.save(checkpoint, model_path)
-    print(f"Model saved successfully to {model_path}")
+    torch.save(checkpoint, FM_model_path)
+    print(f"Model saved successfully to {FM_model_path}")
 
 
 def parse_args():
@@ -375,6 +377,20 @@ def parse_args():
         help="Learning rate for the NN optimizer (default: 1e-3)",
     )
     parser.add_argument(
+        "--fm-reg",
+        "-fr",
+        type=float,
+        default=0.01,
+        help="FM velocity regularization parameter (default: 0.01)",
+    )
+    parser.add_argument(
+        "--fm-reg-mode",
+        "-fm",
+        type=str,
+        default="l2",
+        help="FM velocity regularization mode (default: 'l2')",
+    )
+    parser.add_argument(
         "--ot-reg",
         "-r",
         type=float,
@@ -404,6 +420,8 @@ if __name__ == "__main__":
         channels_h=args.channels_h, 
         channels_t=args.channels_t, 
         lr=args.learning_rate,
+        reg_lambda=args.fm_reg,
+        penalty_type=args.fm_reg_mode,
         viz_OT=args.viz_ot,
     )
 
