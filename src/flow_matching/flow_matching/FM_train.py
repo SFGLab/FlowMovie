@@ -147,6 +147,57 @@ def visualize_batch_OT_plan(x0, x1, x1_OT, batch_id, output_path, phi_model, num
     print(f"Saved: {filename}")
 
 
+def visualize_velocity_correlation(
+    tensor: torch.Tensor,
+    t: torch.Tensor,
+    output_path: str,
+    xlabel: str = "X velocity",
+    ylabel: str = "Y velocity",
+    clabel: str = "Time (t)",
+    cmap: str = "viridis",
+    title: str = "Velocity relationship between RNA-seq coordinates.",
+):
+    """Plots the last column against the second-to-last column of a (B, D) PyTorch tensor.
+
+    Args:
+        tensor (torch.Tensor): 2D PyTorch tensor of shape (B, D) where D >= 2.
+        output_path: Folder in which the plot should be saved.
+        xlabel (str): Label for the X-axis.
+        ylabel (str): Label for the Y-axis.
+        title (str): Title for the plot.
+    """
+    if tensor.ndim != 2 or tensor.shape[1] < 2:
+        raise ValueError(
+            "Expected a 2D tensor with shape (B, D) where D >= 2."
+        )
+
+    # Move tensor to CPU, detach gradients, and extract x (D-2) and y (D-1)
+    x = tensor[:, -2].detach().cpu().view(-1).numpy()
+    y = tensor[:, -1].detach().cpu().view(-1).numpy()
+    c = t.detach().cpu().view(-1).numpy()
+
+    plt.figure(figsize=(8, 5))
+    scatter = plt.scatter(x, y, c=c, cmap=cmap, alpha=0.8, edgecolors="none")
+
+    # Add colorbar
+    cbar = plt.colorbar(scatter)
+    cbar.set_label(clabel)
+
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+
+    plt.xlim((-10, 10))
+    plt.ylim((-10, 10))
+    
+    filename = os.path.join(output_path, f"FM_velocity_correlation.png")
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved: {filename}")
+
+
 def calculate_FM_loss(prediction, target_ut, reg_lambda=0.01, penalty_type="l2"):
     """
     Calculates Flow Matching loss with velocity magnitude regularization.
@@ -238,6 +289,9 @@ def train_FM(FM_model, phi_model_path, optim, pt_file_path, test_name, mode="phi
             xt = (1 - t[:, None]) * x0 + t[:, None] * x1_OT
         elif mode == "phi":
             xt, target_ut = compute_flow_matching_target_fast(phi_model, x0, x1_OT, t)
+
+        if viz_OT and i == 0:
+            visualize_velocity_correlation(target_ut, t, viz_path)
 
         pred = FM_model(xt, t)
         loss_train = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
