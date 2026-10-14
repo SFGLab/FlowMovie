@@ -161,9 +161,11 @@ def visualize_velocity_correlation(
 
     Args:
         tensor (torch.Tensor): 2D PyTorch tensor of shape (B, D) where D >= 2.
-        output_path: Folder in which the plot should be saved.
+        output_path: Path where the plot should be saved.
         xlabel (str): Label for the X-axis.
         ylabel (str): Label for the Y-axis.
+        clabel (str): Label for the colorbar.
+        cmap (str): Matplotlib colormap name.
         title (str): Title for the plot.
     """
     if tensor.ndim != 2 or tensor.shape[1] < 2:
@@ -171,7 +173,6 @@ def visualize_velocity_correlation(
             "Expected a 2D tensor with shape (B, D) where D >= 2."
         )
 
-    # Move tensor to CPU, detach gradients, and extract x (D-2) and y (D-1)
     x = tensor[:, -2].detach().cpu().view(-1).numpy()
     y = tensor[:, -1].detach().cpu().view(-1).numpy()
     c = t.detach().cpu().view(-1).numpy()
@@ -179,7 +180,6 @@ def visualize_velocity_correlation(
     plt.figure(figsize=(8, 5))
     scatter = plt.scatter(x, y, c=c, cmap=cmap, alpha=0.8, edgecolors="none")
 
-    # Add colorbar
     cbar = plt.colorbar(scatter)
     cbar.set_label(clabel)
 
@@ -188,11 +188,8 @@ def visualize_velocity_correlation(
     plt.title(title)
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.tight_layout()
-
-    plt.xlim((-10, 10))
-    plt.ylim((-10, 10))
     
-    filename = os.path.join(output_path, f"FM_velocity_correlation.png")
+    filename = os.path.join(output_path)
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"Saved: {filename}")
@@ -276,12 +273,6 @@ def train_FM(FM_model, phi_model_path, optim, pt_file_path, test_name, mode="phi
 
         # Optimal Transport plan (modifies x1 so as to create OT):
         x1_OT = get_OT_x1(x0, x1, reg=OT_reg)
-        if viz_OT and i == 0:
-            print("\nVisualizing the OT plan for the first iteration...")
-            viz_path = f"../../../results/FM/{test_name}/viz"
-            if not os.path.exists(viz_path): os.makedirs(viz_path)
-            visualize_batch_OT_plan(x0, x1, x1_OT, i, \
-                                    viz_path, phi_model, num_steps=N)
         
         # target velocity and xt with or without Phi interpolant correction:
         if mode == "linear":
@@ -290,12 +281,22 @@ def train_FM(FM_model, phi_model_path, optim, pt_file_path, test_name, mode="phi
         elif mode == "phi":
             xt, target_ut = compute_flow_matching_target_fast(phi_model, x0, x1_OT, t)
 
-        if viz_OT and i == 0:
-            visualize_velocity_correlation(target_ut, t, viz_path)
-
         pred = FM_model(xt, t)
         loss_train = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
-    
+
+        # Visualization of the OT and velocities
+        if viz_OT and i == 0:
+            print("\nVisualizing the OT plan for the first iteration...")
+            viz_path = f"../../../results/FM/{test_name}/viz"
+            if not os.path.exists(viz_path): os.makedirs(viz_path)
+            visualize_batch_OT_plan(x0, x1, x1_OT, i, \
+                                    viz_path, phi_model, num_steps=N)
+            
+            visualize_velocity_correlation(target_ut, t, 
+                                           os.path.join(viz_path, "FM_velocities_mu.png"))
+            visualize_velocity_correlation(pred, t, 
+                                           os.path.join(viz_path, "FM_velocities_fm.png"))
+        
         # ======== calculate test loss ======== 
         # Optimal Transport plan
         x1_test_OT = get_OT_x1(x0_test, x1_test, reg=OT_reg)
