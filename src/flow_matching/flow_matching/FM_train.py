@@ -68,7 +68,7 @@ def compute_flow_matching_target_fast(phi_model, x0, x1, t):
     
     # Forward pass
     phi = phi_model(x0, x1, t.squeeze(1)) # (Batch, D)
-    
+
     # Compute d(Phi)/dt using autograd.grad with a dummy vector product
     # Since Phi only depends on t scalar per batch item:
     grad_outputs = torch.ones_like(phi)
@@ -89,6 +89,27 @@ def compute_flow_matching_target_fast(phi_model, x0, x1, t):
     
     # Compute exact analytic target ut
     # (Assuming Phi output features share time derivative d(Phi)/dt)
+    target_ut = (x1 - x0) + (1 - 2 * t) * phi + t * (1 - t) * dphi_dt_sum
+    
+    return xt.detach(), target_ut.detach()
+
+
+def compute_flow_matching_target_simple(phi_model, x0, x1, t, delta_t = 1e-4):
+    """
+    Simplified computation of d(Phi)/dt for high-dimensional feature spaces.
+
+    x0: (Batch, D)
+    x1: (Batch, D)
+    t:  (Batch, 1) in [0, 1]
+    delta_t: small positive float
+    """
+    t = t.clone().detach().requires_grad_(True)
+    
+    phi = phi_model(x0, x1, t.squeeze(1))
+    phi2 = phi_model(x0, x1, t.squeeze(1) + delta_t)
+    dphi_dt_sum = (phi2 - phi)/delta_t
+
+    xt = (1 - t) * x0 + t * x1 + t * (1 - t) * phi
     target_ut = (x1 - x0) + (1 - 2 * t) * phi + t * (1 - t) * dphi_dt_sum
     
     return xt.detach(), target_ut.detach()
@@ -279,7 +300,7 @@ def train_FM(FM_model, phi_model_path, optim, pt_file_path, test_name, mode="phi
             target_ut = x1_OT - x0
             xt = (1 - t[:, None]) * x0 + t[:, None] * x1_OT
         elif mode == "phi":
-            xt, target_ut = compute_flow_matching_target_fast(phi_model, x0, x1_OT, t)
+            xt, target_ut = compute_flow_matching_target_simple(phi_model, x0, x1_OT, t)
 
         pred = FM_model(xt, t)
         loss_train = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
@@ -307,7 +328,7 @@ def train_FM(FM_model, phi_model_path, optim, pt_file_path, test_name, mode="phi
             target_ut = x1_test - x1_test_OT
             xt = (1 - t[:, None]) * x1_test_OT + t[:, None] * x1_test
         elif mode == "phi":
-            xt, target_ut = compute_flow_matching_target_fast(phi_model, x1_test_OT, x1_test, t)
+            xt, target_ut = compute_flow_matching_target_simple(phi_model, x1_test_OT, x1_test, t)
         
         pred = FM_model(xt, t)
         loss_test = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
