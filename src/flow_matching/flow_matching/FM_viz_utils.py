@@ -130,6 +130,101 @@ def plot_point_evolution(points_list, xlim, ylim):
     return fig
 
 
+def plot_point_evolution2(points_list, xlim, ylim, points_G1=None, points_S=None, points_G2=None):
+    """
+    Similar to plot_point_evolution() but with G1, S and G2 contours marked on the plot.
+    Creates and returns a fig object from a list of structures,
+    including a background KDE density map for the final positions
+    and individual contour lines for G1, S, and G2 phase distributions.
+    """
+    data = np.array(points_list)
+    X = data[:, :, 0]
+    Y = data[:, :, 1]
+    
+    fig, ax = plt.subplots(figsize=(6, 5))
+    
+    x_final = X[-1, :]
+    y_final = Y[-1, :]
+    
+    # Create a 100x100 grid over the specified xlim and ylim bounds
+    xx, yy = np.mgrid[xlim[0]:xlim[1]:100j, ylim[0]:ylim[1]:100j]
+    positions = np.vstack([xx.ravel(), yy.ravel()])
+    final_points = np.vstack([x_final, y_final])
+    
+    # Fit the Gaussian KDE for final points and evaluate on grid
+    kernel = gaussian_kde(final_points)
+    density = np.reshape(kernel(positions).T, xx.shape)
+    
+    _ = ax.pcolormesh(
+        xx, yy, density, 
+        cmap='viridis', 
+        alpha=0.6, 
+        shading='gouraud',
+        zorder=0
+    )
+
+    ax.plot(X, Y, color='black', alpha=0.2, linewidth=2, zorder=1)
+    
+    ax.scatter(X[0, :], Y[0, :], 
+               color='blue', edgecolor='black', marker='o', s=30, label='Start', zorder=3)
+    
+    ax.scatter(X[-1, :], Y[-1, :], 
+               color='yellow', edgecolor='black', marker='o', s=50, label='End', zorder=3)
+    
+    # Define phase configurations: (Label, Points, Hex Color)
+    phase_configs = [
+        ('G1', points_G1, '#E63946'),  # Coral Red
+        ('S',  points_S,  '#F4A261'),  # Amber Orange
+        ('G2', points_G2, '#00F5D4'),  # Mint/Cyan
+    ]
+    
+    for label, pts, color in phase_configs:
+        if pts is not None and len(pts) > 0:
+            pts_arr = np.asarray(pts)
+            # Ensure input shape is (2, N) for scipy's gaussian_kde
+            if pts_arr.shape[0] != 2 and pts_arr.shape[1] == 2:
+                pts_arr = pts_arr.T
+            
+            # Fit KDE for the specific phase distribution
+            phase_kde = gaussian_kde(pts_arr)
+            phase_density = phase_kde(positions).reshape(xx.shape)
+            
+            # Set a threshold level (50th percentile of point densities) for 1 contour line
+            pt_densities = phase_kde(pts_arr)
+            threshold = np.percentile(pt_densities, 50)
+            
+            # Plot single contour line
+            cs = ax.contour(
+                xx, yy, phase_density,
+                levels=[threshold],
+                colors=[color],
+                linewidths=2.5,
+                linestyles='--',
+                zorder=2
+            )
+            
+            # Annotate line directly on the plot
+            ax.clabel(cs, fmt={cs.levels[0]: label}, inline=True, fontsize=10, inline_spacing=4)
+            
+            # Add line entry to legend
+            if hasattr(cs, 'collections') and len(cs.collections) > 0:
+                cs.collections[0].set_label(f'{label} Contour')
+            else:
+                cs.set_label(f'{label} Contour')
+
+    ax.set_title(f'Evolution of {data.shape[1]} FM Trajectories Over Time', fontsize=14, fontweight='bold')
+    ax.set_xlabel('X Coordinate', fontsize=12)
+    ax.set_ylabel('Y Coordinate', fontsize=12)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+        
+    ax.grid(True, linestyle=':', alpha=0.6, zorder=0.5)
+    ax.legend(fontsize=10, loc='best')
+    fig.tight_layout()
+    
+    return fig
+
+
 def plot_2d_velocity_field(model_path, data_path, plot_idx, n_plots, t, out_path, grid_size=20, sample_idx=0, fig_show=False):
     """
     Plots a 2D velocity field for the last two dimensions of a dataset.
@@ -280,7 +375,7 @@ def plot_2d_velocity_field_changes(velocities_x, velocities_y, out_path, end_tim
     plt.close(fig)
     
 
-def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, method="rk4", end_time=0.1):
+def create_FM_gif(model_path, data_path, out_path, phase_trans, num_steps=10, save_every=1, method="rk4", end_time=0.1):
     """
     Main function for creating a gif visualization file for the FM iterated trajectories.
     """
@@ -311,6 +406,21 @@ def create_FM_gif(model_path, data_path, out_path, num_steps=10, save_every=1, m
     for i in range(1, len(structures)):
         figs.append(plot_point_evolution(structures[:i], xlim, ylim))
     create_gif_from_figs(figs, out_path, duration=200)
+
+    if phase_trans == "cycle":
+            out_path2 = out_path[:-4] + "_contours.gif"
+            n_phase = int(N//3)
+            data_G1 = batch_trajectories[:, 0, -2:].cpu().numpy()
+            data_S = batch_trajectories[:, n_phase, -2:].cpu().numpy()
+            data_G2 = batch_trajectories[:, n_phase*2+1, -2:].cpu().numpy()
+
+            figs = []
+            for i in range(1, len(structures)):
+                figs.append(plot_point_evolution2(structures[:i], xlim, ylim,
+                                                 points_G1=data_G1,
+                                                 points_S=data_S,
+                                                 points_G2=data_G2))
+            create_gif_from_figs(figs, out_path2, duration=200)
 
 
 def main():
@@ -395,8 +505,8 @@ def main():
         velocities_y.append(vy)
     plot_2d_velocity_field_changes(velocities_x, velocities_y, vel_path, args.end_time, fig_show=args.fig_show)
 
-    create_FM_gif(FM_model_path, data_path, gif_path, \
-                  num_steps=10, save_every=1, method="rk4", end_time=args.end_time)
+    create_FM_gif(FM_model_path, data_path, gif_path, args.phase_trans, \
+                  num_steps=20, save_every=1, method="rk4", end_time=args.end_time)
 
 
 if __name__ == "__main__":
