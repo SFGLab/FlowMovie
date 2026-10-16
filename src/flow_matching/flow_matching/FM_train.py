@@ -306,18 +306,20 @@ def train_FM(FM_model, phi_model_path, optim, pt_file_path, test_name, mode="phi
         loss_train = calculate_FM_loss(pred, target_ut, reg_lambda=reg_lambda, penalty_type=penalty_type)
 
         # Visualization of the OT and velocities
-        if viz_OT and i == 0:
-            print("\nVisualizing the OT plan for the first iteration...")
-            viz_path = f"../../../results/FM/{test_name}/viz"
-            if not os.path.exists(viz_path): os.makedirs(viz_path)
-            visualize_batch_OT_plan(x0, x1, x1_OT, i, \
-                                    viz_path, phi_model, num_steps=N)
+        if viz_OT:
+            if i == 0:
+                print("\nVisualizing the OT plan for the first iteration...")
+                viz_path = f"../../../results/FM/{test_name}/viz"
+                if not os.path.exists(viz_path): os.makedirs(viz_path)
+                visualize_batch_OT_plan(x0, x1, x1_OT, i, \
+                                        viz_path, phi_model, num_steps=N)
+            elif i == training_steps - 1:
+                print("\nVisualizing the velocity relationships for the last iteration...")
+                visualize_velocity_correlation(target_ut, t, 
+                                            os.path.join(viz_path, "FM_velocities_mu.png"))
+                visualize_velocity_correlation(pred, t, 
+                                            os.path.join(viz_path, "FM_velocities_fm.png"))
             
-            visualize_velocity_correlation(target_ut, t, 
-                                           os.path.join(viz_path, "FM_velocities_mu.png"))
-            visualize_velocity_correlation(pred, t, 
-                                           os.path.join(viz_path, "FM_velocities_fm.png"))
-        
         # ======== calculate test loss ======== 
         # Optimal Transport plan
         x1_test_OT = get_OT_x1(x0_test, x1_test, reg=OT_reg)

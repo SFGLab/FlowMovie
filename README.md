@@ -87,7 +87,7 @@ Move to `./src/flow_matching/flow_matching` folder.
 Train neural Flow Matching velocity field:
 
 ```{bash}
-python FM_train.py -t "test02" -p "cycle" -s 100 -b 10 --viz-ot --ot-reg 0.1
+python FM_train.py -t "test02" -p "cycle" -s 100 -b 10 --viz-ot --ot-reg 0.1 -l 10 -ch 1500 -ct 200 -lr 1e-3 -fr 1e-3 -fm 'l2'
 ```
 
 Create vizualization gifs for the trained FM velocity field. Trajectories will be iterated over time from `0` to the end time specified by the `-e` flag and number of plots specified by the `-n` flag.
