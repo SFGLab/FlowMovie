@@ -26,9 +26,18 @@ Finally:
 
 ## Installing dependencies:
 
-Enable the scripts to import from `src` folder by running the following command in the main FlowMovie folder (where the `pyproject.toml` is located):
+For optimal performance, please install the dependencies into a separate Python environment.
 
 ```{bash}
+pyenv install -v 3.10.14
+pyenv virtualenv 3.10.14 my_FlowMovie_env
+pyenv activate my_FlowMovie_env
+```
+
+Install the depnedencies as specified in `requirements.txt`. To enable the scripts to import from `src` folder by running the following command in the main FlowMovie folder (where the `pyproject.toml` is located):
+
+```{bash}
+pip install -r requirements.txt
 pip install -e .
 ```
 
