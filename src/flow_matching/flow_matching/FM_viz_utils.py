@@ -191,7 +191,7 @@ def plot_point_evolution2(points_list, xlim, ylim, points_G1=None, points_S=None
             
             # Set a threshold level (50th percentile of point densities) for 1 contour line
             pt_densities = phase_kde(pts_arr)
-            threshold = np.percentile(pt_densities, 50)
+            threshold = np.percentile(pt_densities, 40)
             
             # Plot single contour line
             cs = ax.contour(
@@ -219,7 +219,7 @@ def plot_point_evolution2(points_list, xlim, ylim, points_G1=None, points_S=None
     ax.set_ylim(ylim)
         
     ax.grid(True, linestyle=':', alpha=0.6, zorder=0.5)
-    ax.legend(fontsize=10, loc='best')
+    ax.legend(fontsize=10, loc='upper left')
     fig.tight_layout()
     
     return fig
@@ -399,8 +399,11 @@ def create_FM_gif(model_path, data_path, out_path, phase_trans, num_steps=10, sa
     data = np.array(structures)
     X = data[:, :, 0]
     Y = data[:, :, 1]
-    xlim = (np.min(X), np.max(X))
-    ylim = (np.min(Y), np.max(Y))
+    rX = np.max(X) - np.min(X)
+    rY = np.max(Y) - np.min(Y)
+    r_margin = 0.05
+    xlim = (np.min(X)-rX*r_margin, np.max(X)+rX*r_margin)
+    ylim = (np.min(Y)-rY*r_margin, np.max(Y)+rY*r_margin)
         
     figs = []
     for i in range(1, len(structures)):
