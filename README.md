@@ -6,6 +6,8 @@
 
 ## Flow Matching chromatin structure generation based on ChromMovie simulations
 
+<img width="590" height="490" alt="traj_FM_2D_contours" src="https://github.com/user-attachments/assets/60655147-a655-4b64-b272-6ad9fb50f915" />
+
 Pipeline stages:
 
 Preprocessing:
