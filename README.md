@@ -24,9 +24,33 @@ Flow Matching:
 Finally:
 * Analyze
 
+## Repository Structure
+
+```text
+.
+├── chrom_sizes/           # Files for the available chromosome size information
+├── configs/               # Model, training, and experiment configuration files
+├── data/                  # Data folder
+├── models/                # Saved models (automatically created during training)
+    ├── interpolant        # FlowMovie interpolant saved models
+    └── FM                 # FlowMovie flow matching saved models
+├── notebooks/             # Jupyter notebooks for EDA, prototyping, and visualization
+├── results/               # Figures and validation (automatically created after training)
+├── scripts/               # Command-line tools for training, evaluation, and data prep
+├── src/                   # Core package source code
+│   ├── flow_matching/     # FlowMovie models, samplers, and loss functions
+        ├── interpolant/   # FlowMovie interpolant definition, scripts, and loss functions
+        └── flow_matching/ # FlowMovie flow matching definition, scripts, and loss functions
+│   └── md/                # Molecular dynamics utilities
+├── LICENSE                # Project license
+├── pyproject.toml         # Package metadata, build setup
+├── requirements.txt       # Package dependencies
+└── README.md              # Project overview and usage guide
+```
+
 ## Installing dependencies:
 
-For optimal performance, please install the dependencies into a separate Python environment.
+For optimal performance, please install the dependencies into a separate Python environment. For example using `pyenv`:
 
 ```{bash}
 pyenv install -v 3.10.14
@@ -43,7 +67,7 @@ pip install -e .
 
 ## Running ChromMovie simulations:
 
-For creating ChromMovie simulations.
+For creating ChromMovie simulations. For the installation of ChromMovie please see the repository: [ChromMovie](https://github.com/SFGLab/ChromMovie).
 
 Firstly, from `./src/md` folder prepare the data:
 
