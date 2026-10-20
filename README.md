@@ -26,21 +26,21 @@ Finally:
 
 ## Repository Structure
 
-```text
+```{text}
 .
 ├── chrom_sizes/           # Files for the available chromosome size information
 ├── configs/               # Model, training, and experiment configuration files
 ├── data/                  # Data folder
 ├── models/                # Saved models (automatically created during training)
-    ├── interpolant        # FlowMovie interpolant saved models
-    └── FM                 # FlowMovie flow matching saved models
+│   ├── interpolant        # FlowMovie interpolant saved models
+│   └── FM                 # FlowMovie flow matching saved models
 ├── notebooks/             # Jupyter notebooks for EDA, prototyping, and visualization
 ├── results/               # Figures and validation (automatically created after training)
 ├── scripts/               # Command-line tools for training, evaluation, and data prep
 ├── src/                   # Core package source code
 │   ├── flow_matching/     # FlowMovie models, samplers, and loss functions
-        ├── interpolant/   # FlowMovie interpolant definition, scripts, and loss functions
-        └── flow_matching/ # FlowMovie flow matching definition, scripts, and loss functions
+│   │   ├── interpolant/   # FlowMovie interpolant definition, scripts, and loss functions
+│   │   └── flow_matching/ # FlowMovie flow matching definition, scripts, and loss functions
 │   └── md/                # Molecular dynamics utilities
 ├── LICENSE                # Project license
 ├── pyproject.toml         # Package metadata, build setup
