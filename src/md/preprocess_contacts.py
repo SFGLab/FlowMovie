@@ -121,6 +121,27 @@ def get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n=
     return metacell_ids12, metacell_ids23, metacell_ids31, centers12, centers23, centers31
 
 
+def get_traj_aspect_ratio(points: list) -> bool:
+    """
+    Calculates SVD based aspect ration on 2D point set forming an ellipse/shape.
+    
+    Parameters:
+        points: List or array of 2D coordinates.
+        
+    Returns:
+        float: Aspet ratio.
+    """
+    pts = np.array(points, dtype=float).reshape(-1, 2)
+    centered = pts - np.mean(pts, axis=0)
+    _, s, _ = np.linalg.svd(centered) # SVD
+    
+    if s[0] == 0:
+        return 0.0  # All points are likely identical
+        
+    aspect_ratio = s[1] / s[0]
+    return aspect_ratio
+
+
 def plot_metacells(stat_file_path, metacell_ids, save_path=None):
     """
     Visualisation function for ready metacell_ids form get_traj_metacell_ids() function.
@@ -227,6 +248,10 @@ def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2
 
         metacells_ids12, metacells_ids23, metacells_ids31, centers12, centers23, centers31 = \
             get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n, m)
+        # temp = centers12[:-1] + centers23[:-1] + centers31[:-1]
+        # ar = get_traj_aspect_ratio(temp)
+
+        # print(ar)
         # G1 -> S
         prepare_CM_input_trajectory(metacells_ids12, \
                                     os.path.join(output_path, 'G1_to_S', f'trajectory_{str(i).zfill(traj_order)}'), \
