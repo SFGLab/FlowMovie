@@ -4,7 +4,7 @@
 [![python](https://img.shields.io/badge/-Python_3.10+-blue?logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3100/)
 [![pytorch](https://img.shields.io/badge/PyTorch_2.1+-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org/get-started/locally/)
 
-## Flow Matching chromatin structure generation based on ChromMovie simulations
+## Reconstructing 3D Chromatin Dynamics Across the Cell Cycle with Multi-omic Flow Matching
 
 <img width="590" height="490" alt="traj_FM_2D_contours" src="https://github.com/user-attachments/assets/60655147-a655-4b64-b272-6ad9fb50f915" />
 
@@ -32,8 +32,8 @@ Finally:
 ├── configs/               # Model, training, and experiment configuration files
 ├── data/                  # Data folder
 ├── models/                # Saved models (automatically created during training)
-│   ├── interpolant        # FlowMovie interpolant saved models
-│   └── FM                 # FlowMovie flow matching saved models
+│   ├── interpolant/       # FlowMovie interpolant saved models
+│   └── FM/                # FlowMovie flow matching saved models
 ├── notebooks/             # Jupyter notebooks for EDA, prototyping, and visualization
 ├── results/               # Figures and validation (automatically created after training)
 ├── scripts/               # Command-line tools for training, evaluation, and data prep
@@ -58,7 +58,7 @@ pyenv virtualenv 3.10.14 my_FlowMovie_env
 pyenv activate my_FlowMovie_env
 ```
 
-Install the depnedencies as specified in `requirements.txt`. To enable the scripts to import from `src` folder by running the following command in the main FlowMovie folder (where the `pyproject.toml` is located):
+Install dependencies as specified in `requirements.txt`. To enable the scripts to import from `src` folder by running the following command in the main FlowMovie folder (where the `pyproject.toml` is located):
 
 ```{bash}
 pip install -r requirements.txt
