@@ -1,6 +1,6 @@
 # FlowMovie
 
-[![License](https://img.shields.io/github/license/SFGLab/ChromMovie-flow)](LICENSE)
+[![License](https://img.shields.io/github/license/SFGLab/FlowMovie)](LICENSE)
 [![python](https://img.shields.io/badge/-Python_3.10+-blue?logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3100/)
 [![pytorch](https://img.shields.io/badge/PyTorch_2.1+-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org/get-started/locally/)
 
