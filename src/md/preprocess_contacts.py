@@ -123,13 +123,13 @@ def get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n=
 
 def get_traj_aspect_ratio(points: list) -> bool:
     """
-    Calculates SVD based aspect ration on 2D point set forming an ellipse/shape.
+    Calculates SVD based aspect ratio of semi-axes on 2D point set forming an ellipse/shape.
     
     Parameters:
-        points: List or array of 2D coordinates.
+        points: List of 2D coordinates.
         
     Returns:
-        float: Aspet ratio.
+        float: Aspet ratio (1.0 - circle, 0.0 - straight line).
     """
     pts = np.array(points, dtype=float).reshape(-1, 2)
     centered = pts - np.mean(pts, axis=0)
@@ -137,7 +137,7 @@ def get_traj_aspect_ratio(points: list) -> bool:
     
     if s[0] == 0:
         return 0.0  # All points are likely identical
-        
+
     aspect_ratio = s[1] / s[0]
     return aspect_ratio
 
@@ -226,7 +226,7 @@ def create_cycle_folder(output_path, n, traj_order):
         np.savetxt(os.path.join(new_traj_folder, f"{traj_folder}_centers_coords.txt"), new_centers)
 
 
-def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2, m=10, traj_order=5):
+def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2, m=10, traj_order=5, min_traj_ratio=0.1):
     """
     Prepares the input for n_traj trajectories for each phase transition 
     in a proper csv format suitable for ChromMovie simulations.
@@ -242,16 +242,21 @@ def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2
 
     print("Preparing trajectory input for ChromMovie simulations...")
     for i in tqdm(range(n_traj)):
-        cellid_1 = np.random.choice(ids_G1)
-        cellid_2 = np.random.choice(ids_S)
-        cellid_3 = np.random.choice(ids_G2)
+        
+        ar = 0.0
+        ar_counter = 0
+        while ar < min_traj_ratio:
+            cellid_1 = np.random.choice(ids_G1)
+            cellid_2 = np.random.choice(ids_S)
+            cellid_3 = np.random.choice(ids_G2)
+            metacells_ids12, metacells_ids23, metacells_ids31, centers12, centers23, centers31 = \
+                get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n, m)
+            temp = centers12[:-1] + centers23[:-1] + centers31[:-1]
+            ar = get_traj_aspect_ratio(temp)
+            if ar_counter > 1000:
+                raise Exception(f"Could not find trajectory with aspect ratio larger than min_traj_ratio={min_traj_ratio}!")
+            ar_counter += 1
 
-        metacells_ids12, metacells_ids23, metacells_ids31, centers12, centers23, centers31 = \
-            get_traj_metacell_ids_cubic(stat_file_path, cellid_1, cellid_2, cellid_3, n, m)
-        # temp = centers12[:-1] + centers23[:-1] + centers31[:-1]
-        # ar = get_traj_aspect_ratio(temp)
-
-        # print(ar)
         # G1 -> S
         prepare_CM_input_trajectory(metacells_ids12, \
                                     os.path.join(output_path, 'G1_to_S', f'trajectory_{str(i).zfill(traj_order)}'), \
@@ -374,6 +379,13 @@ def main():
         default=10,
         help="Number of cells in each frame (default: 10)",
     )
+    parser.add_argument(
+        "-ar",
+        "--min_ratio",
+        type=float,
+        default=0.1,
+        help="Minimum aspect ratio tolerable for the trajectory (default: 0.1)",
+    )
 
     args = parser.parse_args()
 
@@ -393,7 +405,8 @@ def main():
         n_traj=args.n_traj,
         n=args.n,
         m=args.m,
-        traj_order=traj_order
+        traj_order=traj_order,
+        min_traj_ratio=args.min_ratio
     )
 
     create_cycle_folder(args.out_file, args.n, traj_order=traj_order)

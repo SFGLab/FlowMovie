@@ -72,7 +72,7 @@ For creating ChromMovie simulations. For the installation of ChromMovie please s
 Firstly, from `./src/md` folder prepare the data:
 
 ```{bash}
-python preprocess_contacts.py -t "test02" -s "../../data/unique_cells_PATSKI_1k.txt" -c "../../data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe" --n-traj 10 -n 3 -m 10
+python preprocess_contacts.py -t "test02" -s "../../data/unique_cells_PATSKI_1k.txt" -c "../../data/final_dataset_downsampled_1k/filtered_ChIA-PET.bedpe" --n-traj 10 -n 3 -m 10 -ar 0.1
 ```
 
 Then prepare the configs:
