@@ -3,8 +3,8 @@ import torch
 from torch.utils.data import DataLoader
 import argparse
 
-from src.flow_matching.flow_matching.FM_model import load_FM_model
-from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
+from src.FlowMovie.FM.FM_model import load_FM_model
+from src.FlowMovie.interpolant.interpolant_DataLoader import TrajectoryDataset
 from src.md.visualization_utils import visualize_whole_genome, create_gif
 
 

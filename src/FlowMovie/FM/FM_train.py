@@ -6,10 +6,10 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import argparse
 
-from src.flow_matching.interpolant.interpolant import load_phi_model
-from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
-from src.flow_matching.flow_matching.OT import get_OT_x1
-from src.flow_matching.flow_matching.FM_model import ContinuousFlowMLP
+from src.FlowMovie.interpolant.interpolant import load_phi_model
+from src.FlowMovie.interpolant.interpolant_DataLoader import TrajectoryDataset
+from src.FlowMovie.FM.OT import get_OT_x1
+from src.FlowMovie.FM.FM_model import ContinuousFlowMLP
 
 
 def compute_flow_matching_xt(phi_model, x0, x1, t):

@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import argparse
 
-from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
-from src.flow_matching.interpolant.interpolant import load_phi_model
+from src.FlowMovie.interpolant.interpolant_DataLoader import TrajectoryDataset
+from src.FlowMovie.interpolant.interpolant import load_phi_model
 
 from src.md.visualization_utils import visualize_whole_genome, create_gif, get_chrom_sizes
 

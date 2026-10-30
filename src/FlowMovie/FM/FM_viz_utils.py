@@ -8,9 +8,9 @@ from scipy.stats import gaussian_kde
 from torch.utils.data import DataLoader
 import argparse
 
-from src.flow_matching.flow_matching.FM_model import load_FM_model
-from src.flow_matching.interpolant.interpolant_DataLoader import TrajectoryDataset
-from src.flow_matching.flow_matching.solvers import iterate_trajectory_pytorch
+from src.FlowMovie.FM.FM_model import load_FM_model
+from src.FlowMovie.interpolant.interpolant_DataLoader import TrajectoryDataset
+from src.FlowMovie.FM.solvers import iterate_trajectory_pytorch
 
 
 def plot_model_losses(train_file, test_file, out_path, fig_show=True):

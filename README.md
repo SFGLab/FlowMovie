@@ -38,9 +38,9 @@ Finally:
 ├── results/               # Figures and validation (automatically created after training)
 ├── scripts/               # Command-line tools for training, evaluation, and data prep
 ├── src/                   # Core package source code
-│   ├── flow_matching/     # FlowMovie models, samplers, and loss functions
+│   ├── FlowMovie/         # FlowMovie models, samplers, and loss functions
 │   │   ├── interpolant/   # FlowMovie interpolant definition, scripts, and loss functions
-│   │   └── flow_matching/ # FlowMovie flow matching definition, scripts, and loss functions
+│   │   └── FM/            # FlowMovie flow matching definition, scripts, and loss functions
 │   └── md/                # Molecular dynamics utilities
 ├── LICENSE                # Project license
 ├── pyproject.toml         # Package metadata, build setup

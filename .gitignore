@@ -8,7 +8,7 @@ configs/md/test*
 FlowMovie.egg-info/
 
 # notebooks:
-src/flow_matching/interpolant/.ipynb_checkpoints/
+src/FlowMovie/interpolant/.ipynb_checkpoints/
 src/md/.ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
 
@@ -17,9 +17,9 @@ notebooks/.ipynb_checkpoints/
 
 # pycache
 src/md/__pycache__/
-src/flow_matching/interpolant/__pycache__/
-src/flow_matching/flow_matching/__pycache__/
-src/flow_matching/flow_matching/__pycache__/FM_model.cpython-313.pyc
+src/FlowMovie/interpolant/__pycache__/
+src/FlowMovie/FM/__pycache__/
+src/FlowMovie/FM/__pycache__/FM_model.cpython-313.pyc
 notebooks/__pycache__/
 
 # visualization
