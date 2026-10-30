@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import io
 from PIL import Image
 from scipy.stats import gaussian_kde
+from scipy.optimize import linear_sum_assignment
+from scipy.spatial.distance import cdist, directed_hausdorff
 from torch.utils.data import DataLoader
 import argparse
 
@@ -124,7 +126,6 @@ def plot_point_evolution(points_list, xlim, ylim):
     ax.set_ylim(ylim)
         
     ax.grid(True, linestyle=':', alpha=0.6, zorder=0.5)
-    ax.legend(fontsize=12, loc='best')
     fig.tight_layout()
     
     return fig
@@ -205,12 +206,6 @@ def plot_point_evolution2(points_list, xlim, ylim, points_G1=None, points_S=None
             
             # Annotate line directly on the plot
             ax.clabel(cs, fmt={cs.levels[0]: label}, inline=True, fontsize=10, inline_spacing=4)
-            
-            # Add line entry to legend
-            if hasattr(cs, 'collections') and len(cs.collections) > 0:
-                cs.collections[0].set_label(f'{label} Contour')
-            else:
-                cs.set_label(f'{label} Contour')
 
     ax.set_title(f'Evolution of {data.shape[1]} FM Trajectories Over Time', fontsize=14, fontweight='bold')
     ax.set_xlabel('X Coordinate', fontsize=12)
@@ -219,7 +214,6 @@ def plot_point_evolution2(points_list, xlim, ylim, points_G1=None, points_S=None
     ax.set_ylim(ylim)
         
     ax.grid(True, linestyle=':', alpha=0.6, zorder=0.5)
-    ax.legend(fontsize=10, loc='upper left')
     fig.tight_layout()
     
     return fig
@@ -405,10 +399,10 @@ def create_FM_gif(model_path, data_path, out_path, phase_trans, num_steps=10, sa
     xlim = (np.min(X)-rX*r_margin, np.max(X)+rX*r_margin)
     ylim = (np.min(Y)-rY*r_margin, np.max(Y)+rY*r_margin)
         
-    figs = []
-    for i in range(1, len(structures)):
-        figs.append(plot_point_evolution(structures[:i], xlim, ylim))
-    create_gif_from_figs(figs, out_path, duration=200)
+    # figs = []
+    # for i in range(1, len(structures)):
+    #     figs.append(plot_point_evolution(structures[:i], xlim, ylim))
+    # create_gif_from_figs(figs, out_path, duration=200)
 
     if phase_trans == "cycle":
             out_path2 = out_path[:-4] + "_contours.gif"
@@ -424,6 +418,110 @@ def create_FM_gif(model_path, data_path, out_path, phase_trans, num_steps=10, sa
                                                  points_S=data_S,
                                                  points_G2=data_G2))
             create_gif_from_figs(figs, out_path2, duration=200)
+
+            # Plot evolution using Earth Mover's Distance
+            plot_distribution_progression(
+                structures, data_G1, data_S, data_G2,
+                os.path.join("/".join(out_path.split("/")[:-1]), "phase_similarity_metrics.png"),
+                metric_fn=variance_normalized_emd, fig_show=False
+            )
+
+
+def earth_movers_distance(A, B):
+    """Optimal transport / 1-Wasserstein distance for equal-sized 2D point sets."""
+    cost_matrix = cdist(A, B, metric='euclidean')
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+    return cost_matrix[row_ind, col_ind].mean()
+
+def variance_normalized_emd(A, B, use_std=True):
+    """Calculates Earth Mover's Distance between set A and reference set B,
+
+    normalized by the total variance of reference set B.
+
+    Parameters:
+    A : np.ndarray (n, 2)
+        Current point cloud at time t.
+    B : np.ndarray (n, 2)
+        Reference point cloud (e.g., data_G1, data_S, data_G2).
+    use_std : bool, default=True
+        If True, normalizes by standard deviation (sqrt(Var)) so the metric
+        remains in linear distance units instead of squared units.
+
+    Returns:
+    float : Normalized Earth Mover's Distance.
+    """
+    cost_matrix = cdist(A, B, metric='euclidean')
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+    raw_emd = cost_matrix[row_ind, col_ind].mean()
+
+    ref_variance = np.var(B, axis=0).sum()
+
+    if ref_variance == 0:
+        return 0.0
+
+    scale = np.sqrt(ref_variance) if use_std else ref_variance
+    return raw_emd / scale
+
+def chamfer_distance(A, B):
+    """Symmetric average nearest-neighbor distance between two point clouds."""
+    dists = cdist(A, B, metric='euclidean')
+    return np.mean(np.min(dists, axis=1)) + np.mean(np.min(dists, axis=0))
+
+
+def mean_euclidean_distance(A, B):
+    """Point-wise matched Euclidean distance (preserves index ordering)."""
+    return np.mean(np.linalg.norm(A - B, axis=1))
+
+
+def hausdorff_distance(A, B):
+    """Bidirectional maximum nearest-neighbor distance."""
+    return max(directed_hausdorff(A, B)[0], directed_hausdorff(B, A)[0])
+
+
+def plot_distribution_progression(
+    point_evolution, data_G1, data_S, data_G2, output_path, metric_fn=earth_movers_distance, fig_show=False
+):
+    """Calculates time-series distance to 3 reference sets and plots progression."""
+    # Calculate distance at each time step
+    dist_G1 = [metric_fn(pt_set, data_G1) for pt_set in point_evolution]
+    dist_S = [metric_fn(pt_set, data_S) for pt_set in point_evolution]
+    dist_G2 = [metric_fn(pt_set, data_G2) for pt_set in point_evolution]
+
+    time_steps = np.arange(len(point_evolution))
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(
+        time_steps,
+        dist_G1,
+        label='Distance to G1',
+        color='#1f77b4',
+        linewidth=2.5,
+    )
+    plt.plot(
+        time_steps, dist_S, label='Distance to S', color='#2ca02c', linewidth=2.5
+    )
+    plt.plot(
+        time_steps,
+        dist_G2,
+        label='Distance to G2',
+        color='#d62728',
+        linewidth=2.5,
+    )
+
+    plt.xlabel('Time Step (Frame)', fontsize=12)
+    plt.ylabel(f'Distance Metric ({metric_fn.__name__})', fontsize=12)
+    plt.title(
+        'Point Cloud Distribution Similarity Evolution Over Time', fontsize=14
+    )
+    plt.legend(frameon=True, facecolor='white', framealpha=0.9)
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    if fig_show:
+        plt.show()
+    else:
+        plt.savefig(output_path)
+        print(f"Successfully saved 2D velocity field changes png at {output_path}")
+    plt.close()
 
 
 def main():
@@ -455,8 +553,8 @@ def main():
         "--n-plots",
         "-n",
         type=int,
-        default=5,
-        help="Number of 2D velocity field plots to create (default: 5)",
+        default=10,
+        help="Number of 2D velocity field plots to create (default: 10)",
     )
     parser.add_argument(
         "--fig-show",
@@ -509,7 +607,7 @@ def main():
     plot_2d_velocity_field_changes(velocities_x, velocities_y, vel_path, args.end_time, fig_show=args.fig_show)
 
     create_FM_gif(FM_model_path, data_path, gif_path, args.phase_trans, \
-                  num_steps=20, save_every=1, method="rk4", end_time=args.end_time)
+                  num_steps=args.n_plots, save_every=1, method="rk4", end_time=args.end_time)
 
 
 if __name__ == "__main__":
