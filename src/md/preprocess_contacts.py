@@ -12,6 +12,23 @@ import seaborn as sns
 import argparse
 
 
+def prepare_directory(folder_path):
+    """
+    Creates a folder if does not exist. If exists removes all of the previous files and subfolders.
+    """
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.remove(file_path)  # Deletes the file
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)  # Deletes subdirectories if needed
+        except Exception as e:
+            print(f"Failed to delete {file_path}. Reason: {e}")
+
+
 def get_diameter(points):
     """
     Calculates the diameter of the convex hull around a group of points (maximal distance between points).
@@ -185,8 +202,7 @@ def prepare_CM_input_trajectory(metacells_ids, output_path, contact_file_path, t
     The input data is expected to be in bedpe format with an additional column specifying the cellid.
     The output csv files are saved into the 'output_path'.
     """
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
+    prepare_directory(output_path)
 
     df_contact = load_contact_data(contact_file_path)
     
@@ -204,16 +220,15 @@ def create_cycle_folder(output_path, n, traj_order):
     traj_folders = os.listdir(phase_folders[0])
 
     cycle_path = os.path.join(output_path, "cycle")
-    if not os.path.exists(cycle_path):
-        os.makedirs(cycle_path)
+    prepare_directory(cycle_path)
 
     metacell_files = [f for f in os.listdir(os.path.join(phase_folders[0], traj_folders[0])) if f.startswith("metacell_")]
     metacell_files.sort()
     
     for traj_folder in traj_folders:
         new_traj_folder = os.path.join(cycle_path, traj_folder)
-        if not os.path.exists(new_traj_folder):
-            os.makedirs(new_traj_folder)
+        prepare_directory(new_traj_folder)
+
         new_centers = []
         k = 0
         for phase_folder in phase_folders:
@@ -239,6 +254,9 @@ def prepare_CM_input(output_path, contact_file_path, stat_file_path, n_traj, n=2
     ids_G1 = df[df['Phase'] == "G1"]['cellid']
     ids_S= df[df['Phase'] == "S"]['cellid']
     ids_G2 = df[df['Phase'] == "G2M"]['cellid']
+
+    for phase in ['G1_to_S', 'S_to_G2M', 'G2M_to_G1', 'cycle']:
+        prepare_directory(os.path.join(output_path, phase))
 
     print("Preparing trajectory input for ChromMovie simulations...")
     for i in tqdm(range(n_traj)):
