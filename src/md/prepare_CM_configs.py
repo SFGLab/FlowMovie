@@ -2,12 +2,13 @@ import yaml
 import os
 import argparse
 
+from preprocess_contacts import prepare_directory
+
 
 def prepare_CM_configs(test_name, template_path, CM_input_directory, CM_output_directory):
     # Create config directory if it doesn't exist
     config_out_path = os.path.join("/".join(template_path.split("/")[:-1]), test_name)
-    if not os.path.exists(config_out_path):
-        os.makedirs(config_out_path)
+    prepare_directory(config_out_path)
 
     # Load the base template
     with open(template_path, 'r') as f:
