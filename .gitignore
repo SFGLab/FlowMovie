@@ -18,8 +18,7 @@ notebooks/.ipynb_checkpoints/
 # pycache
 src/md/__pycache__/
 src/FlowMovie/interpolant/__pycache__/
-src/FlowMovie/FM/__pycache__/
-src/FlowMovie/FM/__pycache__/FM_model.cpython-313.pyc
+src/FlowMovie/FM/__pycache__/*
 notebooks/__pycache__/
 
 # visualization
