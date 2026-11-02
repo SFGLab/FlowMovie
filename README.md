@@ -6,23 +6,11 @@
 
 ## Reconstructing 3D Chromatin Dynamics Across the Cell Cycle with Multi-omic Flow Matching
 
+FlowMovie is a novel algorithm for analysis of the three-dimensional, multi-omic modeling of the chromatin structure over the course of cell cycle trajectory. The algorithms draws on the concepts of Schrödinger bridges and Flow Matching and uses the non-zero drift reference process in guiding a realistic single-cell chromatin structure evolution. FlowMovie currently operates on two mutli-omic modalities: 3D chromatin contacts and gene expression.
+
 <img width="590" height="490" alt="traj_FM_2D_contours" src="https://github.com/user-attachments/assets/60655147-a655-4b64-b272-6ad9fb50f915" />
 
-Pipeline stages:
-
-Preprocessing:
-* Embed RNA-seq and ATAC-seq
-* Prepare data for ChromMovie
-* Run ChromMovie simulations
- 
-Flow Matching:
-* Learn interpolant $\varphi$
-* Compare the impact of phi on trajectories
-* Train OT and final velocity field
-* Compare and visualize resulting trajectories
- 
-Finally:
-* Analyze
+The FlowMovie pipeline consists of the two main parts: interpolant training and velocity field training akin to  other studies on the use of Flow Matching in non-gradient field dynamics. Additionally, the training of the interpolant part requires a 3D chromatin structure set, in the form of 3D coordinates, ordered along a given trajectory as well as the multi-omic dataset. For the initial 3D chromatin structures we recommend checking [ChromMovie](https://github.com/SFGLab/ChromMovie). As our multi-omic data set we used [ChAIR](https://pmc.ncbi.nlm.nih.gov/articles/PMC12955729/).
 
 ## Repository Structure
 
