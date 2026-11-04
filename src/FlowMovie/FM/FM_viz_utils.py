@@ -219,6 +219,78 @@ def plot_point_evolution2(points_list, xlim, ylim, points_G1=None, points_S=None
     return fig
 
 
+def plot_point_evolution3(points_list, xlim, ylim, out_path="./", points_G1=None, points_S=None, points_G2=None):
+    """
+    Similar to plot_point_evolution() but with G1, S and G2 contours marked on the plot.
+    Creates and returns a fig object from a list of structures,
+    including a background KDE density map for the final positions
+    and individual contour lines for G1, S, and G2 phase distributions.
+    """
+    data = np.array(points_list)
+    X = data[:, :, 0]
+    Y = data[:, :, 1]
+    
+    fig, ax = plt.subplots(figsize=(12, 10))
+    
+    # Create a 100x100 grid over the specified xlim and ylim bounds
+    xx, yy = np.mgrid[xlim[0]:xlim[1]:100j, ylim[0]:ylim[1]:100j]
+    positions = np.vstack([xx.ravel(), yy.ravel()])
+
+    # ax.plot(X[[0,-1], :], Y[[0,-1], :], color='gray', alpha=0.2, linewidth=2, zorder=1)
+    ax.plot(X, Y, color='gray', alpha=0.2, linewidth=2, zorder=1)
+    
+    ax.scatter(X[0, :], Y[0, :], 
+               color='blue', edgecolor='black', marker='o', s=30, label='Start', zorder=3)
+    
+    ax.scatter(X[-1, :], Y[-1, :], 
+               color='yellow', edgecolor='black', marker='o', s=50, label='End', zorder=3)
+    
+    # Define phase configurations: (Label, Points, Hex Color)
+    phase_configs = [
+        ('G1', points_G1, '#E63946'),  # Coral Red
+        ('S',  points_S,  '#F4A261'),  # Amber Orange
+        ('G2', points_G2, '#00F5D4'),  # Mint/Cyan
+    ]
+    
+    for label, pts, color in phase_configs:
+        if pts is not None and len(pts) > 0:
+            pts_arr = np.asarray(pts)
+            # Ensure input shape is (2, N) for scipy's gaussian_kde
+            if pts_arr.shape[0] != 2 and pts_arr.shape[1] == 2:
+                pts_arr = pts_arr.T
+            
+            # Fit KDE for the specific phase distribution
+            phase_kde = gaussian_kde(pts_arr)
+            phase_density = phase_kde(positions).reshape(xx.shape)
+            
+            # Set a threshold level (50th percentile of point densities) for 1 contour line
+            pt_densities = phase_kde(pts_arr)
+            threshold = np.percentile(pt_densities, 50)
+            
+            # Plot single contour line
+            cs = ax.contour(
+                xx, yy, phase_density,
+                levels=[threshold],
+                colors=[color],
+                linewidths=2.5,
+                linestyles='--',
+                zorder=2
+            )
+            
+            # Annotate line directly on the plot
+            ax.clabel(cs, fmt={cs.levels[0]: label}, inline=True, fontsize=10, inline_spacing=4)
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+        
+    ax.grid(True, linestyle=':', alpha=0.6, zorder=0.5)
+    fig.tight_layout()
+    plt.savefig(os.path.join(out_path, f"traj_FM_plot.png"))
+    plt.close()
+
+
 def plot_2d_velocity_field(model_path, data_path, plot_idx, n_plots, t, out_path, grid_size=20, sample_idx=0, fig_show=False):
     """
     Plots a 2D velocity field for the last two dimensions of a dataset.
@@ -398,7 +470,7 @@ def create_FM_gif(model_path, data_path, out_path, phase_trans, num_steps=10, sa
     r_margin = 0.05
     xlim = (np.min(X)-rX*r_margin, np.max(X)+rX*r_margin)
     ylim = (np.min(Y)-rY*r_margin, np.max(Y)+rY*r_margin)
-        
+    
     # figs = []
     # for i in range(1, len(structures)):
     #     figs.append(plot_point_evolution(structures[:i], xlim, ylim))
@@ -417,6 +489,14 @@ def create_FM_gif(model_path, data_path, out_path, phase_trans, num_steps=10, sa
                                                  points_G1=data_G1,
                                                  points_S=data_S,
                                                  points_G2=data_G2))
+                
+                if i == len(structures)-2:
+                    plot_point_evolution3(structures[:i], xlim, ylim,
+                                                 out_path='/'.join(out_path.split('/')[:-1]),
+                                                 points_G1=data_G1,
+                                                 points_S=data_S,
+                                                 points_G2=data_G2)
+                    
             create_gif_from_figs(figs, out_path2, duration=200)
 
             # Plot evolution using Earth Mover's Distance
@@ -432,6 +512,7 @@ def earth_movers_distance(A, B):
     cost_matrix = cdist(A, B, metric='euclidean')
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
     return cost_matrix[row_ind, col_ind].mean()
+
 
 def variance_normalized_emd(A, B, use_std=True):
     """Calculates Earth Mover's Distance between set A and reference set B,
@@ -509,7 +590,7 @@ def plot_distribution_progression(
     )
 
     plt.xlabel('Time Step (Frame)', fontsize=12)
-    plt.ylabel(f'Distance Metric ({metric_fn.__name__})', fontsize=12)
+    plt.ylabel(f'Distance Metric', fontsize=12)
     plt.title(
         'Point Cloud Distribution Similarity Evolution Over Time', fontsize=14
     )

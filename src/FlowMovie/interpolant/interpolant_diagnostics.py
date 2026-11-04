@@ -457,7 +457,7 @@ def plot_consecutive_angle_distr(mu_pred, output_path, plot_show=False, resoluti
     if plot_show: plt.show()
 
 
-def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=False):
+def plot_rmsd(mu_pred, orig_traj, output_path, font_size=20, plot_show=False):
     """
     Creates a heatmap of RMSD values between the inferred trajectory and original structures from ChromMovie simulation.
     Additionally, a heatmap of RMSD between linear trajectory and original, as well as the difference between the two is created.
@@ -483,51 +483,54 @@ def plot_rmsd(mu_pred, orig_traj, output_path, plot_show=False):
 
     # Plot Heatmap with predicted
     plt.figure(figsize=(9, 7))
-    sns.heatmap(
+    h = sns.heatmap(
         rmsd_matrix,
         cmap="RdYlGn_r",
         xticklabels=1,
         yticklabels=1,
         cbar_kws={"label": "RMSD"},
     )
+    h.collections[0].colorbar.set_label("RMSD", fontsize=font_size)
 
-    plt.xlabel("Original Trajectory Structure Index")
-    plt.ylabel("Model Trajectory Index")
-    plt.title("Pairwise (All-vs-All) RMSD Heatmap for predicted trajectory")
+    plt.xlabel("Original Trajectory Structure Index", fontsize=font_size)
+    plt.ylabel("Model Trajectory Index", fontsize=font_size)
+    # plt.title("Pairwise (All-vs-All) RMSD Heatmap for predicted trajectory")
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, "model_RMSD_with_predicted.png"), dpi=300)
     if plot_show: plt.show()
 
     # Plot Heatmap with linear
     plt.figure(figsize=(9, 7))
-    sns.heatmap(
+    h = sns.heatmap(
         rmsd_matrix2,
         cmap="RdYlGn_r",
         xticklabels=1,
         yticklabels=1,
         cbar_kws={"label": "RMSD"},
     )
+    h.collections[0].colorbar.set_label("RMSD", fontsize=font_size)
 
-    plt.xlabel("Original Trajectory Structure Index")
-    plt.ylabel("Model Trajectory Index")
-    plt.title("Pairwise (All-vs-All) RMSD Heatmap for linear interpolation")
+    plt.xlabel("Original Trajectory Structure Index", fontsize=font_size)
+    plt.ylabel("Model Trajectory Index", fontsize=font_size)
+    # plt.title("Pairwise (All-vs-All) RMSD Heatmap for linear interpolation")
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, "model_RMSD_with_linear.png"), dpi=300)
     if plot_show: plt.show()
 
     # Plot Heatmap of differences between RMSDs from linear and predicted
     plt.figure(figsize=(9, 7))
-    sns.heatmap(
+    h = sns.heatmap(
         rmsd_matrix - rmsd_matrix2,
         cmap="RdYlGn_r",
         xticklabels=1,
         yticklabels=1,
         cbar_kws={"label": "RMSD difference"},
     )
+    h.collections[0].colorbar.set_label("RMSD difference", fontsize=font_size)
 
-    plt.xlabel("Original Trajectory Structure Index")
-    plt.ylabel("Model Trajectory Index")
-    plt.title("Pairwise (All-vs-All) difference between linear and predicted RMSD Heatmap")
+    plt.xlabel("Original Trajectory Structure Index", fontsize=font_size)
+    plt.ylabel("Model Trajectory Index", fontsize=font_size)
+    # plt.title("Pairwise (All-vs-All) difference between linear and predicted RMSD Heatmap")
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, "model_RMSD_difference.png"), dpi=300)
     if plot_show: plt.show()

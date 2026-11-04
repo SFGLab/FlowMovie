@@ -142,10 +142,10 @@ def visualize_batch_OT_plan(x0, x1, x1_OT, batch_id, output_path, phi_model, num
     for i in range(x0.shape[0]):
         traj_x = [step[i,-2].cpu().detach().numpy() for step in steps_preOT]
         traj_y = [step[i,-1].cpu().detach().numpy() for step in steps_preOT]
-        ax[0].plot(traj_x, traj_y, color="red", alpha=0.2, lw=5)
+        ax[0].plot(traj_x, traj_y, color="red", alpha=0.2, lw=2)
         traj_x = [step[i,-2].cpu().detach().numpy() for step in steps_postOT]
         traj_y = [step[i,-1].cpu().detach().numpy() for step in steps_postOT]
-        ax[1].plot(traj_x, traj_y, color="red", alpha=0.2, lw=5)
+        ax[1].plot(traj_x, traj_y, color="red", alpha=0.2, lw=2)
         
     ax[0].set_title(
         f"Trajectories pre OT",
